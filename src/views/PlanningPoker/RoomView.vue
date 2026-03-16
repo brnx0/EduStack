@@ -8,6 +8,11 @@ const router = useRouter();
 const roomId = route.params.roomId as string;
 
 const username = ref(localStorage.getItem('poker-username') || '');
+const userId = ref(localStorage.getItem('poker-userid') || '');
+if (!userId.value) {
+  userId.value = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+  localStorage.setItem('poker-userid', userId.value);
+}
 const showJoinModal = ref(!username.value);
 const joinName = ref('');
 
@@ -15,7 +20,7 @@ let socket: Socket | null = null;
 
 const decks = {
   fibonacci: ['0', '1', '2', '3', '5', '8', '13', '21', '34', '55', '89', '?'],
-  fabrica: ['30','60','120','150','180','210','240','270','300','330','360','390','420', '?']
+  fabrica: ['30','60','120','150','180','210','240','270','300','330','360','390','420']
 };
 
 type Participant = { name: string; vote: string | null; hasVoted: boolean };
@@ -27,7 +32,7 @@ const myVote = ref<string | null>(null);
 const activeDeck = computed(() => decks[roomState.value.deck as keyof typeof decks] || decks.fibonacci);
 
 const connectSocket = () => {
-  if (!username.value) return;
+  if (!username.value || !userId.value) return;
   
   // Use VITE_API_URL or default local
   socket = io('http://localhost:3001');
@@ -41,13 +46,13 @@ const connectSocket = () => {
       router.replace({ query: {} });
     }
 
-    socket?.emit('join-room', { roomId, name: username.value });
+    socket?.emit('join-room', { roomId, name: username.value, userId: userId.value });
   });
 
   socket.on('room-updated', (state: RoomState) => {
     roomState.value = state;
     if (!state.revealed) {
-      const me = socket?.id ? state.participants[socket.id] : null;
+      const me = state.participants[userId.value];
       myVote.value = me?.vote || null;
     }
   });
@@ -83,7 +88,7 @@ const castVote = (card: string) => {
   if (roomState.value.revealed) return;
   const newVote = myVote.value === card ? null : card;
   myVote.value = newVote;
-  socket?.emit('vote', { roomId, vote: newVote });
+  socket?.emit('vote', { roomId, userId: userId.value, vote: newVote });
 };
 
 const revealVotes = () => {
@@ -134,7 +139,7 @@ const participantsList = computed(() => {
         <div class="form-group">
           <input 
             v-model="joinName" 
-            placeholder="Your Name" 
+            placeholder="Seu Nome" 
             @keyup.enter="joinRoom" 
             autofocus
           />
@@ -150,7 +155,7 @@ const participantsList = computed(() => {
           <h1>Room: {{ roomId }}</h1>
           <button class="icon-btn tooltip" @click="copyInviteLink" aria-label="Copy Invite Link">
             📋
-            <span class="tooltiptext">Copy Link</span>
+            <span class="tooltiptext">Copiar Link</span>
           </button>
         </div>
         <div class="controls">
@@ -160,14 +165,14 @@ const participantsList = computed(() => {
             @click="revealVotes"
             :disabled="participantsList.length === 0"
           >
-            Reveal Cards
+            Revelar Cartas
           </button>
           <button 
             v-else 
             class="action-btn next-btn" 
             @click="resetVotes"
           >
-            Next Round
+            Próxima rodada
           </button>
         </div>
       </header>
@@ -192,7 +197,7 @@ const participantsList = computed(() => {
         </div>
 
         <div v-if="roomState.revealed" class="results">
-          <h3>Average: {{ averageVote }}</h3>
+          <h3>Média: {{ averageVote }}</h3>
         </div>
       </div>
 

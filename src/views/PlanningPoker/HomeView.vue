@@ -50,7 +50,7 @@ const createRoom = () => {
         <label for="deck">Deck</label>
         <select id="deck" v-model="selectedDeck">
           <option value="fibonacci">Fibonacci (0, 1, 2, 3, 5, 8...)</option>
-          <option value="fabrica">Fábrica (30, 60...)</option>
+          <option value="fabrica">Fábrica</option>
         </select>
         <small class="deck-preview">{{ decks[selectedDeck as keyof typeof decks] }}</small>
       </div>

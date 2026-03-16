@@ -18,60 +18,72 @@ const { isDark, toggleTheme } = useTheme();
 
 <style>
 :root {
-  --bg-app: #f4f4f9;
-  --text-primary: #121212;
-  --text-secondary: #555555;
+  /* Tons de Azul Educação - Tema Claro */
+  --blue-primary: #1a4f8b;      /* Azul Institucional */
+  --blue-secondary: #2196f3;    /* Azul de Ação */
+  --blue-hover: #1565c0;        /* Azul Darker para Hover */
+  
+  --bg-app: #f0f4f8;            /* Cinza azulado muito claro */
+  --text-primary: #1c2b39;      /* Azul quase preto para leitura */
+  --text-secondary: #546e7a;    /* Cinza azulado para subtítulos */
   --bg-card: #ffffff;
-  --bg-card-border: rgba(0, 0, 0, 0.1);
+  --bg-card-border: #d1d9e6;
   --bg-input: #ffffff;
-  --border-input: #cccccc;
-  --bg-btn: #646cff;
-  --bg-btn-hover: #747bff;
+  --border-input: #b0bec5;
+  --bg-btn: var(--blue-primary);
+  --bg-btn-hover: var(--blue-hover);
   --text-btn: #ffffff;
-  --bg-btn-disabled: #e0e0e0;
-  --text-btn-disabled: #888888;
+  --bg-btn-disabled: #cfd8dc;
+  --text-btn-disabled: #90a4ae;
   --bg-modal: #ffffff;
-  --bg-overlay: rgba(0, 0, 0, 0.4);
-  --card-back-bg: repeating-linear-gradient(45deg, #e0e0e0, #e0e0e0 10px, #d0d0d0 10px, #d0d0d0 20px);
-  --card-back-border: #bbbbbb;
+  --bg-overlay: rgba(28, 43, 57, 0.6);
+  
+  /* Cartões Educativos (Flashcards) */
+  --card-back-bg: repeating-linear-gradient(45deg, #e3f2fd, #e3f2fd 10px, #bbdefb 10px, #bbdefb 20px);
+  --card-back-border: #90caf9;
   --card-front-bg: #ffffff;
-  --card-front-text: #121212;
-  --card-front-border: #cccccc;
+  --card-front-text: #1c2b39;
+  --card-front-border: #b0bec5;
+  
   --bg-topbar: #ffffff;
-  --border-topbar: rgba(0, 0, 0, 0.1);
-  --border-focus: #646cff;
+  --border-topbar: #d1d9e6;
+  --border-focus: var(--blue-secondary);
 }
 
+/* Tema Escuro - Azul Profundo */
 :root[data-theme='dark'] {
-  --bg-app: #121212;
-  --text-primary: #eeeeee;
-  --text-secondary: #a0a0a0;
-  --bg-card: rgba(255, 255, 255, 0.05);
-  --bg-card-border: rgba(255, 255, 255, 0.1);
-  --bg-input: rgba(0, 0, 0, 0.2);
-  --border-input: rgba(255, 255, 255, 0.2);
-  --bg-btn: #646cff;
-  --bg-btn-hover: #747bff;
+  --bg-app: #0f172a;            /* Azul Marinho Profundo (Slate 950) */
+  --text-primary: #f1f5f9;
+  --text-secondary: #94a3b8;
+  --bg-card: #1e293b;           /* Azul acinzentado */
+  --bg-card-border: #334155;
+  --bg-input: #0f172a;
+  --border-input: #475569;
+  --bg-btn: var(--blue-secondary);
+  --bg-btn-hover: #42a5f5;
   --text-btn: #ffffff;
-  --bg-btn-disabled: #444444;
-  --text-btn-disabled: #888888;
-  --bg-modal: #2a2a35;
-  --bg-overlay: rgba(0, 0, 0, 0.7);
-  --card-back-bg: repeating-linear-gradient(45deg, #2a2a35, #2a2a35 10px, #333340 10px, #333340 20px);
-  --card-back-border: #444455;
-  --card-front-bg: #ffffff;
-  --card-front-text: #121212;
-  --card-front-border: #cccccc;
-  --bg-topbar: #1e1e24;
-  --border-topbar: rgba(255, 255, 255, 0.1);
-  --border-focus: #646cff;
+  --bg-btn-disabled: #334155;
+  --text-btn-disabled: #64748b;
+  --bg-modal: #1e293b;
+  --bg-overlay: rgba(0, 0, 0, 0.8);
+  
+  --card-back-bg: repeating-linear-gradient(45deg, #1e293b, #1e293b 10px, #334155 10px, #334155 20px);
+  --card-back-border: #475569;
+  --card-front-bg: #1e293b;
+  --card-front-text: #f1f5f9;
+  --card-front-border: #334155;
+  
+  --bg-topbar: #1e293b;
+  --border-topbar: #334155;
+  --border-focus: var(--blue-secondary);
 }
 
+/* Base e Estrutura */
 * {
   box-sizing: border-box;
   margin: 0;
   padding: 0;
-  font-family: 'Inter', 'Roboto', sans-serif;
+  font-family: 'Inter', 'Segoe UI', Tahoma, sans-serif;
 }
 
 .app-container {
@@ -80,7 +92,7 @@ const { isDark, toggleTheme } = useTheme();
   color: var(--text-primary);
   display: flex;
   flex-direction: column;
-  transition: background-color 0.3s, color 0.3s;
+  transition: all 0.3s ease;
 }
 
 .app-topbar {
@@ -89,14 +101,19 @@ const { isDark, toggleTheme } = useTheme();
   align-items: center;
   padding: 1rem 2rem;
   background-color: var(--bg-topbar);
-  border-bottom: 1px solid var(--border-topbar);
-  transition: background-color 0.3s, border-color 0.3s;
+  border-bottom: 2px solid var(--border-topbar); /* Linha levemente mais grossa para estrutura */
+  box-shadow: 0 2px 4px rgba(0,0,0,0.05);
 }
 
 .app-topbar .logo {
-  font-weight: bold;
-  font-size: 1.25rem;
-  color: var(--text-primary);
+  font-weight: 800;
+  font-size: 1.4rem;
+  color: var(--blue-primary); /* Logo em destaque azul */
+}
+
+/* No tema dark, a logo precisa ser mais clara */
+:root[data-theme='dark'] .app-topbar .logo {
+  color: var(--blue-secondary);
 }
 
 .theme-toggle {
@@ -112,5 +129,6 @@ const { isDark, toggleTheme } = useTheme();
 
 .theme-toggle:hover {
   border-color: var(--border-focus);
+  background-color: var(--bg-app);
 }
 </style>
