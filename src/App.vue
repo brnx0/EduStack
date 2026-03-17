@@ -1,134 +1,308 @@
 <script setup lang="ts">
-import { useTheme } from './composables/useTheme';
+import { ref, computed } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
 
-const { isDark, toggleTheme } = useTheme();
+// ── Theme ──────────────────────────────────────────────────────────────
+const isDark = ref(true)
+function toggleTheme() { isDark.value = !isDark.value }
+
+// ── Sidebar ────────────────────────────────────────────────────────────
+const sidebarOpen = ref(true)
+
+const navItems = [
+  { label: 'Planning Poker', href: '/poker', icon: 'grid' },
+]
+
+const route  = useRoute()
+const router = useRouter()
+
+// Esconde shell (sidebar + topbar) na tela de login
+const showShell = computed(() => !route.meta.hideHeader)
+
+// Título da rota atual para o topbar
+const pageTitle = computed(() => {
+  const match = navItems.find(i => route.path.startsWith(i.href))
+  return match?.label ?? 'Início'
+})
+
+// ── Drawer ─────────────────────────────────────────────────────────────
+const drawerOpen = ref(false)
+const drawerItem = ref<{ label: string; href: string } | null>(null)
+
+function openDrawer(item: { label: string; href: string }) {
+  drawerItem.value = item
+  drawerOpen.value = true
+}
+function closeDrawer() { drawerOpen.value = false }
+
+// Navega direto (sem drawer) — usado nos itens da nav principal
+function navigate(href: string) {
+  router.push(href)
+}
 </script>
 
 <template>
-  <div class="app-container">
-    <header class="app-topbar">
-      <div class="logo">EduStack Poker</div>
-      <button class="theme-toggle" @click="toggleTheme" aria-label="Toggle Theme">
-        {{ isDark ? '☀️ Light Mode' : '🌙 Dark Mode' }}
-      </button>
-    </header>
-    <router-view />
+  <div
+    class="app-root flex h-screen overflow-hidden font-sans transition-colors duration-300"
+    :class="isDark ? 'bg-zinc-900' : 'bg-zinc-50'"
+  >
+
+    <aside
+      v-if="showShell"
+      class="flex flex-col flex-shrink-0 transition-all duration-300 ease-in-out border-r z-20"
+      :class="[
+        sidebarOpen ? 'w-56' : 'w-14',
+        isDark ? 'bg-zinc-950 border-white/[.06]' : 'bg-white border-zinc-200'
+      ]"
+    >
+      <!-- Logo -->
+      <div @click="router.push('/home')"
+        class="flex items-center gap-2.5 px-3.5 border-b h-14 flex-shrink-0"
+        :class="isDark ? 'border-white/[.06]' : 'border-zinc-200'"
+      >
+        <div class="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg bg-blue-500">
+          <svg class="w-3.5 h-3.5 text-white" viewBox="0 0 16 16" fill="none">
+            <rect x="1" y="1" width="6" height="6" rx="1.5" fill="currentColor" opacity=".9"/>
+            <rect x="9" y="1" width="6" height="6" rx="1.5" fill="currentColor" opacity=".6"/>
+            <rect x="1" y="9" width="6" height="6" rx="1.5" fill="currentColor" opacity=".6"/>
+            <rect x="9" y="9" width="6" height="6" rx="1.5" fill="currentColor" opacity=".3"/>
+          </svg>
+        </div>
+        <span
+          v-if="sidebarOpen"
+          class="text-sm font-semibold tracking-wide whitespace-nowrap overflow-hidden"
+          :class="isDark ? 'text-white' : 'text-zinc-900'"
+        >
+          EduStack
+        </span>
+      </div>
+
+      <!-- Nav -->
+      <nav class="flex flex-col gap-1 p-2 flex-1 overflow-y-auto">
+        <button
+          v-for="item in navItems"
+          :key="item.href"
+          @click="navigate(item.href)"
+          class="group flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-left transition-all duration-150 w-full"
+          :class="[
+            route.path.startsWith(item.href)
+              ? isDark ? 'bg-blue-500/10 text-blue-400' : 'bg-blue-50 text-blue-600'
+              : isDark ? 'text-zinc-500 hover:bg-white/[.04] hover:text-zinc-200'
+                       : 'text-zinc-500 hover:bg-zinc-100 hover:text-zinc-800'
+          ]"
+          :title="!sidebarOpen ? item.label : ''"
+        >
+          <span class="flex-shrink-0 w-4 h-4 flex items-center justify-center">
+            <svg v-if="item.icon === 'grid'" class="w-4 h-4" viewBox="0 0 16 16" fill="none">
+              <rect x="1" y="1" width="6" height="6" rx="1" stroke="currentColor" stroke-width="1.3"/>
+              <rect x="9" y="1" width="6" height="6" rx="1" stroke="currentColor" stroke-width="1.3"/>
+              <rect x="1" y="9" width="6" height="6" rx="1" stroke="currentColor" stroke-width="1.3"/>
+              <rect x="9" y="9" width="6" height="6" rx="1" stroke="currentColor" stroke-width="1.3"/>
+            </svg>
+          </span>
+          <span
+            v-if="sidebarOpen"
+            class="text-xs font-medium whitespace-nowrap overflow-hidden"
+          >
+            {{ item.label }}
+          </span>
+        </button>
+      </nav>
+
+      <!-- Bottom: tema + recolher -->
+      <div
+        class="flex flex-col gap-1 p-2 border-t flex-shrink-0"
+        :class="isDark ? 'border-white/[.06]' : 'border-zinc-200'"
+      >
+        <button
+          @click="toggleTheme"
+          class="flex items-center gap-2.5 rounded-lg px-2.5 py-2 transition-all duration-150 w-full"
+          :class="isDark
+            ? 'text-zinc-500 hover:bg-white/[.04] hover:text-zinc-200'
+            : 'text-zinc-500 hover:bg-zinc-100 hover:text-zinc-800'"
+          :title="!sidebarOpen ? (isDark ? 'Modo claro' : 'Modo escuro') : ''"
+        >
+          <span class="flex-shrink-0 w-4 h-4 flex items-center justify-center">
+            <svg v-if="isDark" class="w-4 h-4" viewBox="0 0 16 16" fill="none">
+              <circle cx="8" cy="8" r="2.5" stroke="currentColor" stroke-width="1.3"/>
+              <path d="M8 1v1.5M8 13.5V15M1 8h1.5M13.5 8H15M2.93 2.93l1.06 1.06M12.01 12.01l1.06 1.06M2.93 13.07l1.06-1.06M12.01 3.99l1.06-1.06" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
+            </svg>
+            <svg v-else class="w-4 h-4" viewBox="0 0 16 16" fill="none">
+              <path d="M13.5 10A6 6 0 016 2.5a6 6 0 100 11 6 6 0 007.5-3.5z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/>
+            </svg>
+          </span>
+          <span v-if="sidebarOpen" class="text-xs font-medium whitespace-nowrap">
+            {{ isDark ? 'Modo claro' : 'Modo escuro' }}
+          </span>
+        </button>
+
+        <button
+          @click="sidebarOpen = !sidebarOpen"
+          class="flex items-center gap-2.5 rounded-lg px-2.5 py-2 transition-all duration-150 w-full"
+          :class="isDark
+            ? 'text-zinc-600 hover:bg-white/[.04] hover:text-zinc-400'
+            : 'text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600'"
+        >
+          <span class="flex-shrink-0 w-4 h-4 flex items-center justify-center">
+            <svg
+              class="w-4 h-4 transition-transform duration-300"
+              :class="sidebarOpen ? '' : 'rotate-180'"
+              viewBox="0 0 16 16" fill="none"
+            >
+              <path d="M10 3L5 8l5 5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </span>
+          <span v-if="sidebarOpen" class="text-xs font-medium whitespace-nowrap">Recolher</span>
+        </button>
+      </div>
+    </aside>
+
+    <!-- ══════════════════════════════════════════
+         CONTEÚDO PRINCIPAL
+    ══════════════════════════════════════════ -->
+    <div class="flex flex-1 flex-col overflow-hidden">
+
+      <!-- Topbar — oculta na tela de login -->
+      <header
+        v-if="showShell"
+        class="flex h-14 flex-shrink-0 items-center justify-between border-b px-6"
+        :class="isDark ? 'bg-zinc-950 border-white/[.06]' : 'bg-white border-zinc-200'"
+      >
+        <div class="flex items-center gap-3">
+          <h1
+            class="text-sm font-semibold"
+            :class="isDark ? 'text-white' : 'text-zinc-900'"
+          >
+            {{ pageTitle }}
+          </h1>
+          <span
+            class="rounded-full px-2 py-0.5 text-[.6rem] font-medium uppercase tracking-widest border"
+            :class="isDark
+              ? 'border-blue-500/20 bg-blue-500/10 text-blue-400'
+              : 'border-blue-200 bg-blue-50 text-blue-600'"
+          >
+            Interno
+          </span>
+        </div>
+
+        <div class="flex items-center gap-3">
+          <span class="text-xs" :class="isDark ? 'text-zinc-600' : 'text-zinc-400'">dev.team</span>
+          <div class="flex h-7 w-7 items-center justify-center rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 text-[.65rem] font-semibold text-white">
+            DT
+          </div>
+        </div>
+      </header>
+
+      <!-- Página — router-view único e definitivo -->
+      <main
+        class="flex-1 overflow-hidden"
+        :class="isDark ? 'bg-zinc-900' : 'bg-zinc-50'"
+      >
+        <!-- isDark é passado via v-bind para todos os filhos que declaram a prop -->
+        <router-view v-slot="{ Component }">
+          <component :is="Component" :isDark="isDark" />
+        </router-view>
+      </main>
+    </div>
+
+    <!-- ══════════════════════════════════════════
+         DRAWER (para formulários futuros)
+    ══════════════════════════════════════════ -->
+    <Transition name="fade">
+      <div
+        v-if="drawerOpen"
+        class="fixed inset-0 z-30 bg-black/40 backdrop-blur-[2px]"
+        @click="closeDrawer"
+      />
+    </Transition>
+
+    <Transition name="slide">
+      <aside
+        v-if="drawerOpen"
+        class="fixed right-0 top-0 z-40 flex h-full w-full max-w-md flex-col shadow-2xl"
+        :class="isDark ? 'bg-zinc-900' : 'bg-white'"
+      >
+        <div
+          class="flex h-14 flex-shrink-0 items-center justify-between border-b px-5"
+          :class="isDark ? 'border-white/[.06]' : 'border-zinc-200'"
+        >
+          <div class="flex items-center gap-2.5">
+            <div class="h-1.5 w-1.5 rounded-full bg-blue-500" />
+            <span
+              class="text-sm font-semibold"
+              :class="isDark ? 'text-white' : 'text-zinc-900'"
+            >
+              {{ drawerItem?.label }}
+            </span>
+          </div>
+          <button
+            @click="closeDrawer"
+            class="flex h-7 w-7 items-center justify-center rounded-lg transition-colors"
+            :class="isDark
+              ? 'text-zinc-500 hover:bg-white/[.06] hover:text-zinc-300'
+              : 'text-zinc-400 hover:bg-zinc-100 hover:text-zinc-700'"
+          >
+            <svg class="w-4 h-4" viewBox="0 0 16 16" fill="none">
+              <path d="M3 3l10 10M13 3L3 13" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+            </svg>
+          </button>
+        </div>
+
+        <div class="flex-1 overflow-y-auto p-5">
+          <!-- Conteúdo do formulário será inserido aqui via slot/componente dinâmico -->
+          <div class="flex flex-col items-center justify-center gap-3 py-16 text-center">
+            <div
+              class="flex h-12 w-12 items-center justify-center rounded-xl border"
+              :class="isDark ? 'border-white/[.06] bg-zinc-800' : 'border-zinc-200 bg-zinc-100'"
+            >
+              <svg class="w-5 h-5" :class="isDark ? 'text-zinc-600' : 'text-zinc-400'" viewBox="0 0 20 20" fill="none">
+                <rect x="3" y="3" width="14" height="14" rx="2" stroke="currentColor" stroke-width="1.4"/>
+                <path d="M7 8h6M7 11h4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
+              </svg>
+            </div>
+            <p class="text-sm font-medium" :class="isDark ? 'text-zinc-400' : 'text-zinc-600'">
+              {{ drawerItem?.label }}
+            </p>
+            <p class="max-w-[220px] text-xs leading-relaxed" :class="isDark ? 'text-zinc-600' : 'text-zinc-400'">
+              O formulário desta seção será renderizado aqui quando implementado.
+            </p>
+          </div>
+        </div>
+
+        <div
+          class="flex flex-shrink-0 items-center justify-end gap-2 border-t px-5 py-3.5"
+          :class="isDark ? 'border-white/[.06]' : 'border-zinc-200'"
+        >
+          <button
+            @click="closeDrawer"
+            class="rounded-lg border px-4 py-2 text-xs font-medium transition-all"
+            :class="isDark
+              ? 'border-zinc-700 text-zinc-400 hover:border-zinc-600 hover:text-zinc-200'
+              : 'border-zinc-200 text-zinc-500 hover:border-zinc-300 hover:text-zinc-700'"
+          >
+            Cancelar
+          </button>
+          <button class="rounded-lg bg-blue-500 px-4 py-2 text-xs font-semibold text-white transition-all hover:bg-blue-400 active:scale-[.98]">
+            Salvar
+          </button>
+        </div>
+      </aside>
+    </Transition>
+
   </div>
 </template>
 
-<style>
-:root {
-  /* Tons de Azul Educação - Tema Claro */
-  --blue-primary: #1a4f8b;      /* Azul Institucional */
-  --blue-secondary: #2196f3;    /* Azul de Ação */
-  --blue-hover: #1565c0;        /* Azul Darker para Hover */
-  
-  --bg-app: #f0f4f8;            /* Cinza azulado muito claro */
-  --text-primary: #1c2b39;      /* Azul quase preto para leitura */
-  --text-secondary: #546e7a;    /* Cinza azulado para subtítulos */
-  --bg-card: #ffffff;
-  --bg-card-border: #d1d9e6;
-  --bg-input: #ffffff;
-  --border-input: #b0bec5;
-  --bg-btn: var(--blue-primary);
-  --bg-btn-hover: var(--blue-hover);
-  --text-btn: #ffffff;
-  --bg-btn-disabled: #cfd8dc;
-  --text-btn-disabled: #90a4ae;
-  --bg-modal: #ffffff;
-  --bg-overlay: rgba(28, 43, 57, 0.6);
-  
-  /* Cartões Educativos (Flashcards) */
-  --card-back-bg: repeating-linear-gradient(45deg, #e3f2fd, #e3f2fd 10px, #bbdefb 10px, #bbdefb 20px);
-  --card-back-border: #90caf9;
-  --card-front-bg: #ffffff;
-  --card-front-text: #1c2b39;
-  --card-front-border: #b0bec5;
-  
-  --bg-topbar: #ffffff;
-  --border-topbar: #d1d9e6;
-  --border-focus: var(--blue-secondary);
-}
+<style scoped>
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap');
 
-/* Tema Escuro - Azul Profundo */
-:root[data-theme='dark'] {
-  --bg-app: #0f172a;            /* Azul Marinho Profundo (Slate 950) */
-  --text-primary: #f1f5f9;
-  --text-secondary: #94a3b8;
-  --bg-card: #1e293b;           /* Azul acinzentado */
-  --bg-card-border: #334155;
-  --bg-input: #0f172a;
-  --border-input: #475569;
-  --bg-btn: var(--blue-secondary);
-  --bg-btn-hover: #42a5f5;
-  --text-btn: #ffffff;
-  --bg-btn-disabled: #334155;
-  --text-btn-disabled: #64748b;
-  --bg-modal: #1e293b;
-  --bg-overlay: rgba(0, 0, 0, 0.8);
-  
-  --card-back-bg: repeating-linear-gradient(45deg, #1e293b, #1e293b 10px, #334155 10px, #334155 20px);
-  --card-back-border: #475569;
-  --card-front-bg: #1e293b;
-  --card-front-text: #f1f5f9;
-  --card-front-border: #334155;
-  
-  --bg-topbar: #1e293b;
-  --border-topbar: #334155;
-  --border-focus: var(--blue-secondary);
-}
+.font-sans { font-family: 'DM Sans', sans-serif; }
+.font-mono { font-family: 'DM Mono', monospace; }
 
-/* Base e Estrutura */
-* {
-  box-sizing: border-box;
-  margin: 0;
-  padding: 0;
-  font-family: 'Inter', 'Segoe UI', Tahoma, sans-serif;
+.slide-enter-active, .slide-leave-active {
+  transition: transform 0.25s cubic-bezier(.4,0,.2,1);
 }
+.slide-enter-from, .slide-leave-to { transform: translateX(100%); }
 
-.app-container {
-  min-height: 100vh;
-  background-color: var(--bg-app);
-  color: var(--text-primary);
-  display: flex;
-  flex-direction: column;
-  transition: all 0.3s ease;
-}
-
-.app-topbar {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 1rem 2rem;
-  background-color: var(--bg-topbar);
-  border-bottom: 2px solid var(--border-topbar); /* Linha levemente mais grossa para estrutura */
-  box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-}
-
-.app-topbar .logo {
-  font-weight: 800;
-  font-size: 1.4rem;
-  color: var(--blue-primary); /* Logo em destaque azul */
-}
-
-/* No tema dark, a logo precisa ser mais clara */
-:root[data-theme='dark'] .app-topbar .logo {
-  color: var(--blue-secondary);
-}
-
-.theme-toggle {
-  background: var(--bg-input);
-  border: 1px solid var(--border-input);
-  color: var(--text-primary);
-  padding: 0.5rem 1rem;
-  border-radius: 0.5rem;
-  cursor: pointer;
-  font-weight: 600;
-  transition: all 0.2s;
-}
-
-.theme-toggle:hover {
-  border-color: var(--border-focus);
-  background-color: var(--bg-app);
-}
+.fade-enter-active, .fade-leave-active { transition: opacity 0.2s ease; }
+.fade-enter-from, .fade-leave-to { opacity: 0; }
 </style>

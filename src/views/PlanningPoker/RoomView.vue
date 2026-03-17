@@ -33,19 +33,14 @@ const activeDeck = computed(() => decks[roomState.value.deck as keyof typeof dec
 
 const connectSocket = () => {
   if (!username.value || !userId.value) return;
-  
-  // Use VITE_API_URL or default local
   socket = io('http://localhost:3001');
 
   socket.on('connect', () => {
-    // If we're creating the room (we have deck in query)
     const deckQuery = route.query.deck as string;
     if (deckQuery) {
       socket?.emit('create-room', { roomId, deck: deckQuery });
-      // Remove query param to clean up URL
       router.replace({ query: {} });
     }
-
     socket?.emit('join-room', { roomId, name: username.value, userId: userId.value });
   });
 
@@ -63,17 +58,8 @@ const connectSocket = () => {
   });
 };
 
-onMounted(() => {
-  if (username.value) {
-    connectSocket();
-  }
-});
-
-onUnmounted(() => {
-  if (socket) {
-    socket.disconnect();
-  }
-});
+onMounted(() => { if (username.value) connectSocket(); });
+onUnmounted(() => { if (socket) socket.disconnect(); });
 
 const joinRoom = () => {
   if (joinName.value.trim()) {
@@ -91,17 +77,11 @@ const castVote = (card: string) => {
   socket?.emit('vote', { roomId, userId: userId.value, vote: newVote });
 };
 
-const revealVotes = () => {
-  socket?.emit('reveal-votes', { roomId });
-};
-
-const resetVotes = () => {
-  socket?.emit('reset-votes', { roomId });
-};
+const revealVotes  = () => socket?.emit('reveal-votes', { roomId });
+const resetVotes   = () => socket?.emit('reset-votes',  { roomId });
 
 const copyInviteLink = async () => {
-  const url = window.location.href;
-  await navigator.clipboard.writeText(url);
+  await navigator.clipboard.writeText(window.location.href);
   alert('Invite link copied to clipboard!');
 };
 
@@ -110,357 +90,217 @@ const averageVote = computed(() => {
   const votes = Object.values(roomState.value.participants)
     .map(p => p.vote)
     .filter(v => v !== null && v !== '?');
-  
   if (votes.length === 0) return 0;
-  
   const sum = votes.reduce((acc, val) => {
-    // Basic mapping for non-numeric (if necessary, though average makes more sense for numbers)
     const num = parseFloat(val!);
     return isNaN(num) ? acc : acc + num;
   }, 0);
-  
   const numVoters = votes.filter(v => !isNaN(parseFloat(v!))).length;
-  if(numVoters === 0) return '-';
-  
+  if (numVoters === 0) return '-';
   return (sum / numVoters).toFixed(1);
 });
 
-const participantsList = computed(() => {
-  return Object.entries(roomState.value.participants).map(([id, p]) => ({ id, ...p }));
-});
+const participantsList = computed(() =>
+  Object.entries(roomState.value.participants).map(([id, p]) => ({ id, ...p }))
+);
+
+// Herda o tema do portal via prop
+const props = defineProps<{ isDark?: boolean }>();
+const isDark = computed(() => props.isDark ?? true);
 </script>
 
 <template>
-  <main class="room">
-    <!-- Join Modal if accessed directly via URL -->
-    <div v-if="showJoinModal" class="modal-overlay">
-      <div class="modal">
-        <h2>Join Room</h2>
-        <div class="form-group">
-          <input 
-            v-model="joinName" 
-            placeholder="Seu Nome" 
-            @keyup.enter="joinRoom" 
+  <!-- O componente herda o bg do HomeView via .app-root -->
+  <main class="flex flex-col flex-1 transition-colors duration-300">
+
+    <!-- ── Join Modal ── -->
+    <div
+      v-if="showJoinModal"
+      class="fixed inset-0 z-[1000] flex items-center justify-center bg-black/50 backdrop-blur-sm"
+    >
+      <div
+        class="w-[90%] max-w-sm rounded-2xl border p-8 shadow-2xl"
+        :class="isDark
+          ? 'bg-zinc-900 border-white/[.06]'
+          : 'bg-white border-zinc-200'"
+      >
+        <h2
+          class="mb-6 text-xl font-bold"
+          :class="isDark ? 'text-white' : 'text-zinc-900'"
+        >
+          Entrar na sala
+        </h2>
+        <div class="flex gap-2">
+          <input
+            v-model="joinName"
+            placeholder="Seu nome"
+            @keyup.enter="joinRoom"
             autofocus
+            class="flex-1 rounded-lg border px-3 py-2.5 text-sm outline-none transition-all"
+            :class="isDark
+              ? 'bg-zinc-800 border-zinc-700 text-white placeholder-zinc-600 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15'
+              : 'bg-zinc-50 border-zinc-300 text-zinc-900 placeholder-zinc-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/15'"
           />
-          <button @click="joinRoom" :disabled="!joinName.trim()">Join</button>
+          <button
+            @click="joinRoom"
+            :disabled="!joinName.trim()"
+            class="rounded-lg bg-blue-500 px-5 py-2.5 text-sm font-semibold text-white transition-all hover:bg-blue-400 active:scale-[.98] disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            Entrar
+          </button>
         </div>
       </div>
     </div>
 
-    <!-- Main Room View -->
-    <div v-else class="table-container">
-      <header class="room-header">
-        <div class="title-area">
-          <h1>Room: {{ roomId }}</h1>
-          <button class="icon-btn tooltip" @click="copyInviteLink" aria-label="Copy Invite Link">
-            📋
-            <span class="tooltiptext">Copiar Link</span>
+    <!-- ── Room View ── -->
+    <div v-else class="flex flex-col flex-1 w-full max-w-5xl mx-auto px-4 md:px-8 py-4">
+
+      <!-- Header -->
+      <header
+        class="flex items-center justify-between border-b py-4"
+        :class="isDark ? 'border-white/[.06]' : 'border-zinc-200'"
+      >
+        <div class="flex items-center gap-3">
+          <h1
+            class="text-base font-semibold"
+            :class="isDark ? 'text-white' : 'text-zinc-900'"
+          >
+            Sala:
+            <span class="font-mono text-blue-400">{{ roomId }}</span>
+          </h1>
+
+          <!-- Copy link -->
+          <button
+            @click="copyInviteLink"
+            aria-label="Copiar link"
+            class="group relative flex h-7 w-7 items-center justify-center rounded-lg border transition-all"
+            :class="isDark
+              ? 'border-zinc-700 text-zinc-500 hover:border-zinc-600 hover:text-zinc-300'
+              : 'border-zinc-200 text-zinc-400 hover:border-zinc-300 hover:text-zinc-600'"
+          >
+            <svg class="w-3.5 h-3.5" viewBox="0 0 16 16" fill="none">
+              <rect x="5" y="5" width="8" height="8" rx="1.5" stroke="currentColor" stroke-width="1.3"/>
+              <path d="M3 11V3h8" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            <span
+              class="invisible group-hover:visible absolute bottom-[130%] left-1/2 -translate-x-1/2 whitespace-nowrap rounded-md px-2 py-1 text-[.65rem] font-medium opacity-0 group-hover:opacity-100 transition-opacity"
+              :class="isDark ? 'bg-zinc-700 text-zinc-200' : 'bg-zinc-800 text-white'"
+            >
+              Copiar link
+            </span>
           </button>
         </div>
-        <div class="controls">
-          <button 
-            v-if="!roomState.revealed" 
-            class="action-btn reveal-btn" 
+
+        <!-- Actions -->
+        <div class="flex gap-2">
+          <button
+            v-if="!roomState.revealed"
             @click="revealVotes"
             :disabled="participantsList.length === 0"
+            class="rounded-lg bg-blue-500 px-4 py-2 text-xs font-semibold text-white transition-all hover:bg-blue-400 active:scale-[.98] disabled:cursor-not-allowed disabled:opacity-40"
           >
-            Revelar Cartas
+            Revelar cartas
           </button>
-          <button 
-            v-else 
-            class="action-btn next-btn" 
+          <button
+            v-else
             @click="resetVotes"
+            class="rounded-lg bg-emerald-500 px-4 py-2 text-xs font-semibold text-white transition-all hover:bg-emerald-400 active:scale-[.98]"
           >
             Próxima rodada
           </button>
         </div>
       </header>
 
-      <div class="board">
-        <div class="participants">
-          <div 
-            v-for="p in participantsList" 
-            :key="p.id" 
-            class="participant-card"
-            :class="{ voted: p.hasVoted }"
+      <!-- Participants -->
+      <div class="flex flex-1 flex-col items-center justify-center py-10">
+        <div class="flex flex-wrap justify-center gap-6">
+          <div
+            v-for="p in participantsList"
+            :key="p.id"
+            class="flex flex-col items-center gap-2.5"
           >
-            <div class="card-back" v-if="!roomState.revealed">
-              <span v-if="p.hasVoted" class="voted-icon">✓</span>
-              <span v-else class="thinking-icon">...</span>
+            <!-- Card face-down -->
+            <div
+              v-if="!roomState.revealed"
+              class="flex h-24 w-16 items-center justify-center rounded-xl border-2 text-xl font-bold shadow-md transition-all duration-300"
+              :class="p.hasVoted
+                ? 'border-blue-500 bg-blue-500 text-white shadow-blue-500/20'
+                : isDark
+                  ? 'border-zinc-700 bg-zinc-800 text-zinc-600'
+                  : 'border-zinc-200 bg-zinc-100 text-zinc-400'"
+            >
+              <span v-if="p.hasVoted">
+                <svg class="w-5 h-5 text-white" viewBox="0 0 16 16" fill="none">
+                  <path d="M2.5 8l4 4 7-7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+              </span>
+              <span v-else class="animate-pulse text-sm">···</span>
             </div>
-            <div class="card-front" v-else>
-              {{ p.vote || '-' }}
+
+            <!-- Card revealed -->
+            <div
+              v-else
+              class="flex h-24 w-16 items-center justify-center rounded-xl border-2 text-xl font-bold shadow-md transition-all duration-300"
+              :class="isDark
+                ? 'border-zinc-600 bg-zinc-800 text-white'
+                : 'border-zinc-300 bg-white text-zinc-900'"
+            >
+              {{ p.vote || '–' }}
             </div>
-            <div class="participant-name">{{ p.name }}</div>
+
+            <span
+              class="text-xs font-medium"
+              :class="isDark ? 'text-zinc-500' : 'text-zinc-500'"
+            >
+              {{ p.name }}
+            </span>
           </div>
         </div>
 
-        <div v-if="roomState.revealed" class="results">
-          <h3>Média: {{ averageVote }}</h3>
+        <!-- Average badge -->
+        <div
+          v-if="roomState.revealed"
+          class="mt-10 rounded-xl border px-8 py-4"
+          :class="isDark
+            ? 'border-emerald-500/25 bg-emerald-500/10'
+            : 'border-emerald-200 bg-emerald-50'"
+        >
+          <p class="text-center text-2xl font-bold text-emerald-500">
+            Média: {{ averageVote }}
+          </p>
         </div>
       </div>
 
-      <div class="deck-container">
-        <div class="deck">
-          <button 
-            v-for="card in activeDeck" 
+      <!-- Voting deck -->
+      <div
+        class="mt-auto border-t py-8"
+        :class="isDark ? 'border-white/[.06]' : 'border-zinc-200'"
+      >
+        <div class="flex flex-wrap justify-center gap-2.5 md:gap-3">
+          <button
+            v-for="card in activeDeck"
             :key="card"
-            class="playing-card"
-            :class="{ 
-              selected: myVote === card, 
-              disabled: roomState.revealed 
-            }"
             @click="castVote(card)"
             :disabled="roomState.revealed"
+            class="flex h-16 w-12 items-center justify-center rounded-lg border-2 text-base font-bold shadow-sm outline-none transition-all duration-200 md:h-20 md:w-14 md:text-lg"
+            :class="[
+              roomState.revealed
+                ? 'cursor-not-allowed opacity-40'
+                : 'cursor-pointer hover:-translate-y-2 hover:shadow-lg',
+              myVote === card
+                ? isDark
+                  ? 'border-blue-400 bg-blue-500 text-white shadow-blue-500/30 -translate-y-2 md:-translate-y-3'
+                  : 'border-blue-500 bg-blue-500 text-white shadow-blue-500/30 -translate-y-2 md:-translate-y-3'
+                : isDark
+                  ? 'border-zinc-700 bg-zinc-800 text-zinc-300 hover:border-blue-500 hover:text-white'
+                  : 'border-zinc-200 bg-white text-zinc-700 hover:border-blue-400 hover:text-blue-600'
+            ]"
           >
             {{ card }}
           </button>
         </div>
       </div>
+
     </div>
   </main>
 </template>
-
-<style scoped>
-.room {
-  display: flex;
-  flex-direction: column;
-  flex: 1;
-  background: var(--bg-app);
-}
-
-/* Modal */
-.modal-overlay {
-  position: fixed;
-  inset: 0;
-  background: var(--bg-overlay);
-  backdrop-filter: blur(5px);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1000;
-}
-.modal {
-  background: var(--bg-modal);
-  padding: 2rem;
-  border-radius: 1rem;
-  width: 90%;
-  max-width: 400px;
-  box-shadow: 0 10px 30px rgba(0,0,0,0.2);
-  border: 1px solid var(--bg-card-border);
-}
-.modal h2 { margin-bottom: 1.5rem; color: var(--text-primary); }
-.form-group { display: flex; gap: 0.5rem; }
-.form-group input { flex: 1; padding: 0.75rem; border-radius: 0.5rem; border: 1px solid var(--border-input); background: var(--bg-input); color: var(--text-primary); }
-.form-group button { padding: 0.75rem 1.5rem; border-radius: 0.5rem; border: none; background: var(--bg-btn); color: var(--text-btn); cursor: pointer; }
-
-/* Main Room Layout */
-.table-container {
-  display: flex;
-  flex-direction: column;
-  flex: 1;
-  padding: 1rem 2rem;
-  max-width: 1200px;
-  margin: 0 auto;
-  width: 100%;
-}
-
-.room-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 1rem 0;
-  border-bottom: 1px solid var(--bg-card-border);
-}
-
-.title-area {
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-}
-
-.title-area h1 {
-  font-size: 1.5rem;
-  font-weight: 500;
-  color: var(--text-primary);
-}
-
-.icon-btn {
-  background: none;
-  border: none;
-  font-size: 1.2rem;
-  cursor: pointer;
-  position: relative;
-  transition: opacity 0.2s;
-  opacity: 0.7;
-  color: var(--text-primary);
-}
-.icon-btn:hover { opacity: 1; }
-
-.tooltip .tooltiptext {
-  visibility: hidden;
-  width: 80px;
-  background-color: var(--text-primary);
-  color: var(--bg-app);
-  text-align: center;
-  border-radius: 6px;
-  padding: 5px;
-  position: absolute;
-  z-index: 1;
-  bottom: 125%;
-  left: 50%;
-  margin-left: -40px;
-  font-size: 0.75rem;
-  opacity: 0;
-  transition: opacity 0.3s;
-}
-.tooltip:hover .tooltiptext {
-  visibility: visible;
-  opacity: 1;
-}
-
-.action-btn {
-  padding: 0.75rem 1.5rem;
-  border-radius: 2rem;
-  border: none;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-.reveal-btn { background: var(--bg-btn); color: var(--text-btn); }
-.reveal-btn:hover:not(:disabled) { background: var(--bg-btn-hover); transform: translateY(-2px); }
-.reveal-btn:disabled { background: var(--bg-btn-disabled); color: var(--text-btn-disabled); cursor: not-allowed; }
-.next-btn { background: #42b883; color: white; }
-.next-btn:hover { background: #4dd899; transform: translateY(-2px); }
-
-/* Board */
-.board {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 2rem 0;
-}
-
-.participants {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 2rem;
-  justify-content: center;
-}
-
-.participant-card {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0.5rem;
-}
-
-.card-back, .card-front {
-  width: 60px;
-  height: 90px;
-  border-radius: 0.5rem;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 1.5rem;
-  font-weight: bold;
-  box-shadow: 0 4px 10px rgba(0,0,0,0.1);
-  transition: all 0.3s;
-}
-
-.card-back {
-  background: var(--card-back-bg);
-  border: 2px solid var(--card-back-border);
-  color: var(--text-primary);
-}
-
-.participant-card.voted .card-back {
-  background: var(--bg-btn);
-  border-color: var(--bg-btn-hover);
-}
-
-.voted-icon { color: white; }
-.thinking-icon { color: var(--text-secondary); animation: pulse 1.5s infinite; }
-
-.card-front {
-  background: var(--card-front-bg);
-  color: var(--card-front-text);
-  border: 2px solid var(--card-front-border);
-}
-
-.participant-name {
-  font-size: 0.9rem;
-  color: var(--text-secondary);
-  font-weight: 500;
-}
-
-.results {
-  margin-top: 3rem;
-  background: rgba(66, 184, 131, 0.1);
-  padding: 1rem 2rem;
-  border-radius: 1rem;
-  border: 1px solid rgba(66, 184, 131, 0.4);
-}
-.results h3 {
-  color: #42b883;
-  margin: 0;
-  font-size: 1.5rem;
-}
-
-@keyframes pulse {
-  0% { opacity: 0.5; }
-  50% { opacity: 1; }
-  100% { opacity: 0.5; }
-}
-
-/* Deck area */
-.deck-container {
-  padding: 2rem 0;
-  border-top: 1px solid var(--bg-card-border);
-  margin-top: auto;
-}
-
-.deck {
-  display: flex;
-  justify-content: center;
-  flex-wrap: wrap;
-  gap: 1rem;
-}
-
-.playing-card {
-  width: 50px;
-  height: 75px;
-  border-radius: 0.5rem;
-  background: var(--card-front-bg);
-  color: var(--card-front-text);
-  border: 2px solid var(--card-front-border);
-  font-size: 1.25rem;
-  font-weight: 700;
-  cursor: pointer;
-  transition: all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-  box-shadow: 0 4px 6px rgba(0,0,0,0.05);
-}
-
-.playing-card:hover:not(.disabled) {
-  transform: translateY(-10px);
-  border-color: var(--border-focus);
-  box-shadow: 0 10px 15px rgba(100, 108, 255, 0.2);
-}
-
-.playing-card.selected {
-  background: var(--bg-btn);
-  color: var(--text-btn);
-  border-color: var(--bg-btn-hover);
-  transform: translateY(-15px);
-  box-shadow: 0 10px 20px rgba(100, 108, 255, 0.4);
-}
-
-.playing-card.disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-  transform: none;
-}
-</style>

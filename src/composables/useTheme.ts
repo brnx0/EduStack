@@ -11,6 +11,11 @@ export function useTheme() {
   const updateTheme = () => {
     const theme = isDark.value ? 'dark' : 'light';
     document.documentElement.setAttribute('data-theme', theme);
+    if (isDark.value) {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
     localStorage.setItem('theme', theme);
   };
 

@@ -1,0 +1,9 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:is(.dark *), &:is(.dark));
+
+@theme {
+  --color-blue-primary: #1a4f8b;
+  --color-blue-secondary: #2196f3;
+  --color-blue-hover: #1565c0;
+}
