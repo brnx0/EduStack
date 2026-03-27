@@ -28,10 +28,10 @@ coverage
 
 .eslintcache
 
-.env
-
 # Vitest
 __screenshots__/
 
 # Vite
 *.timestamp-*-*.mjs
+# Arquivos de ambiente
+.env
