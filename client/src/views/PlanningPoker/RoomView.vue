@@ -33,8 +33,8 @@ const activeDeck = computed(() => decks[roomState.value.deck as keyof typeof dec
 
 const connectSocket = () => {
   if (!username.value || !userId.value) return;
-  const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:3001';
-  socket = io(apiUrl);
+  const socketUrl = import.meta.env.VITE_SOCKET_URL || 'http://localhost:3001';
+  socket = io(socketUrl);
 
   socket.on('connect', () => {
     const deckQuery = route.query.deck as string;

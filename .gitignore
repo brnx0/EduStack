@@ -35,3 +35,8 @@ __screenshots__/
 *.timestamp-*-*.mjs
 # Arquivos de ambiente
 .env
+!.env.example
+
+# Temporários do servidor
+tmp/
+server/tmp/
