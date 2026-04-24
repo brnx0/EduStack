@@ -1,277 +1,268 @@
 import {
-  Document,
-  Packer,
-  Paragraph,
-  TextRun,
-  Table,
-  TableRow,
-  TableCell,
-  WidthType,
-  AlignmentType,
-  ImageRun,
-  HeadingLevel,
-  ShadingType,
+	Document,
+	Packer,
+	Paragraph,
+	TextRun,
+	Table,
+	TableRow,
+	TableCell,
+	WidthType,
+	AlignmentType,
+	ImageRun,
+	HeadingLevel,
+	ShadingType,
 } from 'docx';
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
-import sharp from 'sharp';
-import { fromBuffer } from 'pdf2pic';
+import { createCanvas, loadImage } from '@napi-rs/canvas';
+import { createRequire } from 'node:module';
+import { getDocument, GlobalWorkerOptions } from 'pdfjs-dist/legacy/build/pdf.mjs';
 import { enrichDescriptions } from './aiService.js';
+
+// Desabilita worker do pdfjs (não existe em Node.js)
+// Aponta para o worker bundled do pdfjs-dist (necessário mesmo em Node.js)
+const require = createRequire(import.meta.url);
+const workerPath = require.resolve('pdfjs-dist/legacy/build/pdf.worker.mjs');
+GlobalWorkerOptions.workerSrc = `file://${workerPath.replace(/\\/g, '/')}`;
 
 const TMP_DIR = path.join(os.tmpdir(), 'edustack');
 if (!fs.existsSync(TMP_DIR)) fs.mkdirSync(TMP_DIR, { recursive: true });
 
 type CaseRow = {
-  COD_CASO: number;
-  CAS_RESUMO: string;
-  Sprint: string;
-  CAS_DESCRICAO: string;
+	COD_CASO: number;
+	CAS_RESUMO: string;
+	Sprint: string;
+	CAS_DESCRICAO: string;
 };
 
 type AttachmentRow = {
-  COD_CASO: number;
-  UPR_COD: number;
-  UPR_ARQUIVO: Buffer;
+	COD_CASO: number;
+	UPR_COD: number;
+	UPR_ARQUIVO: Buffer;
 };
 
-function detectFormat(buffer: Buffer): 'pdf' | 'png' | 'jpg' | 'unknown' {
-  const hex = buffer.subarray(0, 4).toString('hex').toUpperCase();
-  if (hex.startsWith('25504446')) return 'pdf';
-  if (hex.startsWith('89504E47')) return 'png';
-  if (hex.startsWith('FFD8FF')) return 'jpg';
-  return 'unknown';
+type ImageDimensions = { width: number; height: number };
+
+function stripHtml(html: string): string {
+	if (!html) return '';
+	return html
+		.replace(/<br\s*\/?>/gi, '\n')
+		.replace(/<\/p>/gi, '\n')
+		.replace(/<\/li>/gi, '\n')
+		.replace(/<li[^>]*>/gi, '• ')
+		.replace(/<[^>]+>/g, '')
+		.replace(/&nbsp;/g, ' ')
+		.replace(/&amp;/g, '&')
+		.replace(/&lt;/g, '<')
+		.replace(/&gt;/g, '>')
+		.replace(/&quot;/g, '"')
+		.replace(/&#39;/g, "'")
+		.replace(/\n{3,}/g, '\n\n')
+		.trim();
 }
 
-async function convertAttachmentToBuffer(
-  attachment: AttachmentRow,
-): Promise<Buffer | null> {
-  const format = detectFormat(attachment.UPR_ARQUIVO);
+function detectFormat(buffer: Buffer): 'pdf' | 'png' | 'jpg' | 'unknown' {
+	const hex = buffer.subarray(0, 4).toString('hex').toUpperCase();
+	if (hex.startsWith('25504446')) return 'pdf';
+	if (hex.startsWith('89504E47')) return 'png';
+	if (hex.startsWith('FFD8FF')) return 'jpg';
+	return 'unknown';
+}
 
-  if (format === 'png' || format === 'jpg') {
-    return await sharp(attachment.UPR_ARQUIVO).png().toBuffer();
-  }
+type PageImage = { buf: Buffer; width: number; height: number };
 
-  if (format === 'pdf') {
-    const tmpPdf = path.join(TMP_DIR, `${attachment.UPR_COD}_input.pdf`);
-    fs.writeFileSync(tmpPdf, attachment.UPR_ARQUIVO);
+async function pdfToPages(pdfBuffer: Buffer): Promise<PageImage[]> {
+	const pdf = await getDocument({
+		data: new Uint8Array(pdfBuffer),
+		useSystemFonts: true,
+		isEvalSupported: false,
+	}).promise;
 
-    try {
-      const convert = fromBuffer(attachment.UPR_ARQUIVO, {
-        density: 150,
-        saveFilename: `${attachment.UPR_COD}`,
-        savePath: TMP_DIR,
-        format: 'png',
-        width: 1200,
-        height: 1600,
-      });
+	const pages: PageImage[] = [];
 
-      const pages = await convert.bulk(-1, { responseType: 'buffer' });
-      const validPages = pages
-        .filter((p) => p.buffer)
-        .map((p) => p.buffer as Buffer);
+	for (let i = 1; i <= pdf.numPages; i++) {
+		const page = await pdf.getPage(i);
+		const viewport = page.getViewport({ scale: 1.5 }); // ~150 DPI
+		const w = Math.floor(viewport.width);
+		const h = Math.floor(viewport.height);
 
-      if (validPages.length === 0) return null;
+		const canvas = createCanvas(w, h);
+		const ctx = canvas.getContext('2d');
 
-      if (validPages.length === 1) {
-        return await sharp(validPages[0]).png().toBuffer();
-      }
+		await page.render({ canvasContext: ctx as never, viewport, canvas: canvas as never }).promise;
+		pages.push({ buf: canvas.toBuffer('image/png'), width: w, height: h });
+	}
 
-      const images = await Promise.all(
-        validPages.map((buf) => sharp(buf).metadata().then((meta) => ({ buf, meta }))),
-      );
+	return pages;
+}
 
-      const maxWidth = Math.max(...images.map((i) => i.meta.width ?? 0));
-      const totalHeight = images.reduce((sum, i) => sum + (i.meta.height ?? 0), 0);
+async function convertAttachment(attachment: AttachmentRow): Promise<PageImage[]> {
+	const raw = attachment.UPR_ARQUIVO;
+	const data: Buffer = Buffer.isBuffer(raw) ? raw : Buffer.from(raw as unknown as ArrayBuffer);
 
-      const combined = sharp({
-        create: {
-          width: maxWidth,
-          height: totalHeight,
-          channels: 4,
-          background: { r: 255, g: 255, b: 255, alpha: 1 },
-        },
-      });
+	const format = detectFormat(data);
+	try {
+		if (format === 'png' || format === 'jpg') {
+			const img = await loadImage(data);
+			const canvas = createCanvas(img.width, img.height);
+			canvas.getContext('2d').drawImage(img, 0, 0);
+			return [{ buf: canvas.toBuffer('image/png'), width: img.width, height: img.height }];
+		}
 
-      let offsetY = 0;
-      const compositeOps = images.map(({ buf, meta }) => {
-        const op = { input: buf, top: offsetY, left: 0 };
-        offsetY += meta.height ?? 0;
-        return op;
-      });
+		if (format === 'pdf') {
+			return await pdfToPages(data);
+		}
 
-      return await combined.composite(compositeOps).png().toBuffer();
-    } catch (err) {
-      console.error(`PDF conversion failed for attachment ${attachment.UPR_COD}:`, err);
-      return null;
-    } finally {
-      if (fs.existsSync(tmpPdf)) fs.unlinkSync(tmpPdf);
-    }
-  }
+		console.warn(`[anexo ${attachment.UPR_COD}] formato desconhecido, ignorando.`);
+	} catch (err) {
+		console.error(`[anexo ${attachment.UPR_COD}] erro:`, err);
+	}
 
-  return null;
+	return [];
 }
 
 function headerRow(): TableRow {
-  const cells = ['Card', 'Sprint', 'Solicitação', 'Descrição'].map((label) =>
-    new TableCell({
-      shading: { type: ShadingType.SOLID, color: '1d4ed8' },
-      children: [
-        new Paragraph({
-          alignment: AlignmentType.CENTER,
-          children: [
-            new TextRun({
-              text: label,
-              bold: true,
-              color: 'FFFFFF',
-              size: 20,
-            }),
-          ],
-        }),
-      ],
-    }),
-  );
-  return new TableRow({ children: cells, tableHeader: true });
+	const cells = ['Card', 'Sprint', 'Solicitação', 'Descrição'].map((label) =>
+		new TableCell({
+			shading: { type: ShadingType.SOLID, color: '1d4ed8' },
+			children: [
+				new Paragraph({
+					alignment: AlignmentType.CENTER,
+					children: [new TextRun({ text: label, bold: true, color: 'FFFFFF', size: 20 })],
+				}),
+			],
+		}),
+	);
+	return new TableRow({ children: cells, tableHeader: true });
 }
 
 function caseRow(cas: CaseRow, description: string, isEven: boolean): TableRow {
-  const bg = isEven ? 'F1F5F9' : 'FFFFFF';
-  const makeCell = (text: string) =>
-    new TableCell({
-      shading: { type: ShadingType.SOLID, color: bg },
-      children: [
-        new Paragraph({
-          children: [new TextRun({ text: text ?? '', size: 18 })],
-        }),
-      ],
-    });
+	const bg = isEven ? 'F1F5F9' : 'FFFFFF';
+	const makeCell = (text: string) =>
+		new TableCell({
+			shading: { type: ShadingType.SOLID, color: bg },
+			children: [new Paragraph({ children: [new TextRun({ text: text ?? '', size: 18 })] })],
+		});
 
-  return new TableRow({
-    children: [
-      makeCell(String(cas.COD_CASO)),
-      makeCell(`Sprint${cas.Sprint}`.trim()),
-      makeCell(cas.CAS_RESUMO ?? ''),
-      makeCell(description ?? cas.CAS_DESCRICAO ?? ''),
-    ],
-  });
+	return new TableRow({
+		children: [
+			makeCell(String(cas.COD_CASO)),
+			makeCell(`Sprint${cas.Sprint}`.trim()),
+			makeCell(stripHtml(cas.CAS_RESUMO ?? '')),
+			makeCell(stripHtml(description ?? cas.CAS_DESCRICAO ?? '')),
+		],
+	});
 }
 
 export async function createDocument(
-  cases: CaseRow[],
-  attachments: AttachmentRow[],
-  sprintId: string,
+	cases: CaseRow[],
+	attachments: AttachmentRow[],
+	sprintId: string,
 ): Promise<string> {
-  const rawDescriptions = cases.map((c) => c.CAS_DESCRICAO ?? '');
-  const enriched = await enrichDescriptions(rawDescriptions);
+	const rawDescriptions = cases.map((c) => stripHtml(c.CAS_DESCRICAO ?? ''));
+	const enriched = await enrichDescriptions(rawDescriptions);
 
-  const casesTable = new Table({
-    width: { size: 100, type: WidthType.PERCENTAGE },
-    rows: [
-      headerRow(),
-      ...cases.map((c, i) => caseRow(c, enriched[i] ?? c.CAS_DESCRICAO, i % 2 === 0)),
-    ],
-  });
+	const casesTable = new Table({
+		width: { size: 100, type: WidthType.PERCENTAGE },
+		rows: [
+			headerRow(),
+			...cases.map((c, i) => caseRow(c, enriched[i] ?? c.CAS_DESCRICAO, i % 2 === 0)),
+		],
+	});
 
-  const attachmentSections: (Paragraph | Table)[] = [];
+	const attachmentSections: (Paragraph | Table)[] = [];
 
-  for (const att of attachments) {
-    const imgBuffer = await convertAttachmentToBuffer(att);
+	// Dimensões que cabem 2 imagens por página A4 sem distorcer
+	const MAX_W = 440;
+	const MAX_H = 420;
 
-    attachmentSections.push(
-      new Paragraph({
-        heading: HeadingLevel.HEADING_3,
-        children: [
-          new TextRun({
-            text: `Card: ${att.COD_CASO}`,
-            bold: true,
-            size: 22,
-          }),
-        ],
-        spacing: { before: 300, after: 100 },
-      }),
-    );
+	for (const att of attachments) {
+		const pages = await convertAttachment(att);
 
-    if (imgBuffer) {
-      const meta = await sharp(imgBuffer).metadata();
-      const maxW = 600;
-      const ratio = (meta.height ?? maxW) / (meta.width ?? maxW);
-      const dispW = maxW;
-      const dispH = Math.round(maxW * ratio);
+		if (pages.length > 0) {
+			for (const [idx, page] of pages.entries()) {
+				// Mantém proporção respeitando os dois limites
+				const scaleByW = MAX_W / page.width;
+				const scaleByH = MAX_H / page.height;
+				const scale = Math.min(scaleByW, scaleByH);
+				const dispW = Math.round(page.width * scale);
+				const dispH = Math.round(page.height * scale);
 
-      attachmentSections.push(
-        new Paragraph({
-          alignment: AlignmentType.CENTER,
-          children: [
-            new ImageRun({
-              data: imgBuffer,
-              transformation: { width: dispW, height: dispH },
-              type: 'png',
-            }),
-          ],
-          spacing: { after: 200 },
-        }),
-      );
-    } else {
-      attachmentSections.push(
-        new Paragraph({
-          children: [
-            new TextRun({
-              text: '[Anexo não pôde ser renderizado]',
-              italics: true,
-              color: '999999',
-            }),
-          ],
-        }),
-      );
-    }
-  }
+				const label = pages.length > 1
+					? `Card: ${att.COD_CASO}   |   Pág. ${idx + 1} / ${pages.length}`
+					: `Card: ${att.COD_CASO}`;
 
-  const today = new Date().toLocaleDateString('pt-BR');
+				attachmentSections.push(
+					new Paragraph({
+						spacing: { before: 240, after: 60 },
+						children: [new TextRun({ text: label, bold: true, size: 18, color: '1d4ed8' })],
+					}),
+					new Paragraph({
+						alignment: AlignmentType.CENTER,
+						spacing: { after: 200 },
+						children: [
+							new ImageRun({
+								data: page.buf,
+								transformation: { width: dispW, height: dispH },
+								type: 'png',
+							}),
+						],
+					}),
+				);
+			}
+		} else {
+			attachmentSections.push(
+				new Paragraph({
+					spacing: { before: 240, after: 60 },
+					children: [new TextRun({ text: `Card: ${att.COD_CASO}`, bold: true, size: 18, color: '1d4ed8' })],
+				}),
+				new Paragraph({
+					children: [new TextRun({ text: '[Anexo não pôde ser renderizado]', italics: true, color: '999999' })],
+				}),
+			);
+		}
+	}
 
-  const doc = new Document({
-    sections: [
-      {
-        children: [
-          new Paragraph({
-            alignment: AlignmentType.CENTER,
-            spacing: { after: 100 },
-            children: [
-              new TextRun({
-                text: 'ATESTO DE SPRINT',
-                bold: true,
-                size: 32,
-                color: '1d4ed8',
-              }),
-            ],
-          }),
-          new Paragraph({
-            alignment: AlignmentType.CENTER,
-            spacing: { after: 400 },
-            children: [new TextRun({ text: `Data: ${today}`, size: 20, color: '64748b' })],
-          }),
-          new Paragraph({
-            heading: HeadingLevel.HEADING_2,
-            spacing: { before: 200, after: 200 },
-            children: [new TextRun({ text: 'Casos de Teste', bold: true })],
-          }),
-          casesTable,
-          ...(attachmentSections.length > 0
-            ? [
-                new Paragraph({
-                  heading: HeadingLevel.HEADING_2,
-                  spacing: { before: 600, after: 200 },
-                  children: [new TextRun({ text: 'Anexos', bold: true })],
-                }),
-                ...attachmentSections,
-              ]
-            : []),
-        ],
-      },
-    ],
-  });
+	const today = new Date().toLocaleDateString('pt-BR');
 
-  const buffer = await Packer.toBuffer(doc);
-  const outPath = path.join(TMP_DIR, `Atesto_Final_${Date.now()}.docx`);
-  fs.writeFileSync(outPath, buffer);
-  return outPath;
+	const doc = new Document({
+		sections: [
+			{
+				children: [
+					new Paragraph({
+						alignment: AlignmentType.CENTER,
+						spacing: { after: 100 },
+						children: [new TextRun({ text: 'ATESTO DE SPRINT', bold: true, size: 32, color: '1d4ed8' })],
+					}),
+					new Paragraph({
+						alignment: AlignmentType.CENTER,
+						spacing: { after: 400 },
+						children: [new TextRun({ text: `Data: ${today}`, size: 20, color: '64748b' })],
+					}),
+					new Paragraph({
+						heading: HeadingLevel.HEADING_2,
+						spacing: { before: 200, after: 200 },
+						children: [new TextRun({ text: 'Casos de Teste', bold: true })],
+					}),
+					casesTable,
+					...(attachmentSections.length > 0
+						? [
+							new Paragraph({
+								heading: HeadingLevel.HEADING_2,
+								spacing: { before: 600, after: 200 },
+								children: [new TextRun({ text: 'Anexos', bold: true })],
+							}),
+							...attachmentSections,
+						]
+						: []),
+				],
+			},
+		],
+	});
+
+	const buffer = await Packer.toBuffer(doc);
+	const outPath = path.join(TMP_DIR, `Atesto_Final_${Date.now()}.docx`);
+	fs.writeFileSync(outPath, buffer);
+	return outPath;
 }

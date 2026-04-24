@@ -8,8 +8,9 @@ export async function listProjects(_req: Request, res: Response) {
   try {
     const pool = await getConnection();
     const result = await pool.request().query(`
-      SELECT COD_PROJETO, PRO_NOME, PRO_DESCRICAO
-      FROM SUP_PROJETO_VI
+     SELECT DISTINCT COD_PROJETO, PRO_NOME, 1 as PRO_DESCRICAO
+      FROM SUP_VERSAO_PROJETO_VI
+	  WHERE PRO_NOME LIKE '%Educação%'
       ORDER BY PRO_NOME
     `);
     res.json(result.recordset);
