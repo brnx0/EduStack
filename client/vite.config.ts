@@ -15,7 +15,8 @@ export default defineConfig(({ mode }) => {
   const serverUrl = env.VITE_SOCKET_URL || 'http://localhost:3001'
 
   return {
-    base: './',
+    base: env.VITE_BASE_PATH || '/',
+    envDir: rootDir,
     plugins: [vue(), vueJsx(), vueDevTools(), tailwindcss()],
     resolve: {
       alias: {
