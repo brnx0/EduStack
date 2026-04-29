@@ -8,9 +8,9 @@ export async function listProjects(_req: Request, res: Response) {
   try {
     const pool = await getConnection();
     const result = await pool.request().query(`
-     SELECT DISTINCT COD_PROJETO, PRO_NOME, 1 as PRO_DESCRICAO
+      SELECT DISTINCT COD_PROJETO, PRO_NOME, 1 as PRO_DESCRICAO
       FROM SUP_VERSAO_PROJETO_VI
-	  WHERE PRO_NOME LIKE '%Educação%'
+      WHERE PRO_NOME LIKE '%Educação%'
       ORDER BY PRO_NOME
     `);
     res.json(result.recordset);
@@ -86,7 +86,7 @@ export async function generateDocx(req: Request, res: Response) {
 
     res.download(filePath, `Atesto_Sprint_${sprintId}.docx`, (err) => {
       if (!err) {
-        fs.unlink(filePath, () => {});
+        fs.unlink(filePath, () => { });
       }
     });
   } catch (err: any) {

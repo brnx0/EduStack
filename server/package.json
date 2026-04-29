@@ -14,7 +14,7 @@
   "type": "module",
   "dependencies": {
     "@napi-rs/canvas": "^0.1.99",
-    "@prisma/client": "^7.5.0",
+    "@prisma/client": "^6.0.0",
     "cors": "^2.8.6",
     "docx": "^9.6.1",
     "express": "^5.2.1",
@@ -28,7 +28,7 @@
     "@types/express": "^5.0.6",
     "@types/mssql": "^12.3.0",
     "@types/node": "^25.5.0",
-    "prisma": "^7.5.0",
+    "prisma": "^6.0.0",
     "tsx": "^4.21.0",
     "typescript": "^5.9.3"
   }
