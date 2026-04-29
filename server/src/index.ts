@@ -3,6 +3,8 @@ import { createServer } from 'http';
 import { Server } from 'socket.io';
 import cors from 'cors';
 import projectRoutes from './routes/projects.js';
+import { registerRoutes } from './routes/index.js';
+import { registerSocketHandlers } from './sockets/index.js';
 
 const app = express();
 app.use(cors());
