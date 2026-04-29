@@ -17,6 +17,7 @@ coverage
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
+.claude/*
 .idea
 *.suo
 *.ntvs*
@@ -35,3 +36,8 @@ __screenshots__/
 *.timestamp-*-*.mjs
 # Arquivos de ambiente
 .env
+!.env.example
+
+# Temporários do servidor
+tmp/
+server/tmp/
