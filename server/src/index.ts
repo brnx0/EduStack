@@ -3,13 +3,16 @@ import { createServer } from 'http';
 import { Server } from 'socket.io';
 import cors from 'cors';
 import projectRoutes from './routes/projects.js';
+import authRoutes from './routes/auth.js';
 import { registerRoutes } from './routes/index.js';
 import { registerSocketHandlers } from './sockets/index.js';
+import { authMiddleware } from './middleware/auth.js';
 
 const app = express();
 app.use(cors());
 app.use(express.json());
-app.use('/api', projectRoutes);
+app.use('/api/auth', authRoutes);
+app.use('/api', authMiddleware, projectRoutes);
 
 const httpServer = createServer(app);
 

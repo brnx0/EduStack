@@ -1,4 +1,5 @@
 import { createRouter, createWebHistory } from 'vue-router'
+import { getToken, getUser } from '../composables/useAuth'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -18,6 +19,18 @@ const router = createRouter({
       path: '/atesto',
       name: 'atesto',
       component: () => import('../views/Atesto/AtestoView.vue'),
+      meta: { requiresAdmin: true },
+    },
+    {
+      path: '/monitor',
+      name: 'monitor',
+      component: () => import('../views/Monitor/MonitorView.vue'),
+      meta: { requiresAdmin: true },
+    },
+    {
+      path: '/acesso-negado',
+      name: 'access-denied',
+      component: () => import('../views/AccessDenied/AccessDeniedView.vue'),
     },
     {
       path: '/poker',
@@ -30,6 +43,25 @@ const router = createRouter({
       component: () => import('../views/PlanningPoker/RoomView.vue'),
     },
   ],
+})
+
+router.beforeEach((to, _from, next) => {
+  if (to.meta.hideHeader) {
+    next()
+    return
+  }
+
+  if (!getToken()) {
+    next('/')
+    return
+  }
+
+  if (to.meta.requiresAdmin && !getUser()?.isAdmin) {
+    next('/acesso-negado')
+    return
+  }
+
+  next()
 })
 
 export default router

@@ -1,20 +1,42 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
+import { saveSession } from '../../composables/useAuth'
 
 const router = useRouter()
-const email = ref('')
+const loginInput = ref('')
 const password = ref('')
 const isLoading = ref(false)
 const showPassword = ref(false)
 const rememberMe = ref(false)
 const focused = ref<string | null>(null)
+const errorMsg = ref('')
 
 async function handleLogin() {
+  if (!loginInput.value || !password.value) {
+    errorMsg.value = 'Preencha o login e a senha.'
+    return
+  }
   isLoading.value = true
-  await new Promise((r) => setTimeout(r, 1800))
-  isLoading.value = false
-  router.push('/home')
+  errorMsg.value = ''
+  try {
+    const res = await fetch('/api/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ user: loginInput.value, password: password.value }),
+    })
+    const data = await res.json()
+    if (!res.ok) {
+      errorMsg.value = data.error ?? 'Erro ao autenticar'
+      return
+    }
+    saveSession(data.token, data.user, rememberMe.value)
+    router.push('/home')
+  } catch {
+    errorMsg.value = 'Não foi possível conectar ao servidor.'
+  } finally {
+    isLoading.value = false
+  }
 }
 </script>
 
@@ -122,44 +144,40 @@ async function handleLogin() {
 
         <!-- Form -->
         <form @submit.prevent="handleLogin" novalidate class="flex flex-col gap-5">
-          <!-- Email -->
+          <!-- Login -->
           <div class="flex flex-col gap-1.5">
             <label
-              for="email"
+              for="login"
               class="text-[.7rem] font-medium uppercase tracking-widest text-zinc-500"
             >
-              E-mail corporativo
+              Login
             </label>
             <div class="relative">
               <svg
                 class="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 transition-colors duration-150"
-                :class="focused === 'email' ? 'text-blue-400' : 'text-zinc-600'"
+                :class="focused === 'login' ? 'text-blue-400' : 'text-zinc-600'"
                 viewBox="0 0 20 20"
                 fill="none"
               >
+                <circle cx="10" cy="7" r="3" stroke="currentColor" stroke-width="1.3" />
                 <path
-                  d="M2.5 5.5A1.5 1.5 0 014 4h12a1.5 1.5 0 011.5 1.5v9A1.5 1.5 0 0116 16H4a1.5 1.5 0 01-1.5-1.5v-9z"
-                  stroke="currentColor"
-                  stroke-width="1.3"
-                />
-                <path
-                  d="M2.5 5.5l7.5 5.5 7.5-5.5"
+                  d="M3.5 17c0-3.038 2.91-5.5 6.5-5.5s6.5 2.462 6.5 5.5"
                   stroke="currentColor"
                   stroke-width="1.3"
                   stroke-linecap="round"
                 />
               </svg>
               <input
-                id="email"
-                v-model="email"
-                type="email"
-                placeholder="voce@empresa.com"
-                autocomplete="email"
-                @focus="focused = 'email'"
+                id="login"
+                v-model="loginInput"
+                type="text"
+                placeholder="seu.login"
+                autocomplete="username"
+                @focus="focused = 'login'"
                 @blur="focused = null"
                 class="w-full h-11 rounded-lg border bg-zinc-800 pl-10 pr-4 text-sm text-white placeholder-zinc-600 outline-none transition-all duration-150"
                 :class="
-                  focused === 'email'
+                  focused === 'login'
                     ? 'border-blue-500 ring-2 ring-blue-500/15'
                     : 'border-zinc-700 hover:border-zinc-600'
                 "
@@ -266,6 +284,14 @@ async function handleLogin() {
             </div>
             <span class="text-xs text-zinc-500">Manter sessão ativa</span>
           </label>
+
+          <!-- Error -->
+          <div
+            v-if="errorMsg"
+            class="rounded-lg border border-red-500/30 bg-red-500/10 px-3.5 py-2.5 text-xs text-red-400"
+          >
+            {{ errorMsg }}
+          </div>
 
           <!-- Submit -->
           <button

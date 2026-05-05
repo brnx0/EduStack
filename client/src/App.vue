@@ -2,6 +2,7 @@
 import { computed, ref } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useTheme } from './composables/useTheme'
+import { useAuth, getUser } from './composables/useAuth'
 
 // ── Theme ──────────────────────────────────────────────────────────────
 const { isDark, toggleTheme } = useTheme()
@@ -10,8 +11,9 @@ const { isDark, toggleTheme } = useTheme()
 const sidebarOpen = ref(true)
 
 const navItems = [
-  { label: 'Planning Poker', href: '/poker', icon: 'grid' },
-  { label: 'Atesto de Sprint', href: '/atesto', icon: 'doc' },
+  { label: 'Planning Poker', href: '/poker', icon: 'grid', adminOnly: false },
+  { label: 'Atesto de Sprint', href: '/atesto', icon: 'doc', adminOnly: false },
+  { label: 'Monitor de Atividades', href: '/monitor', icon: 'monitor', adminOnly: true },
 ]
 
 const route = useRoute()
@@ -25,6 +27,14 @@ const pageTitle = computed(() => {
   const match = navItems.find(i => route.path.startsWith(i.href))
   return match?.label ?? 'Início'
 })
+
+// ── Auth ───────────────────────────────────────────────────────────────
+const { logout } = useAuth()
+const currentUser = computed(() => getUser())
+
+const visibleNavItems = computed(() =>
+  navItems.filter(item => item.adminOnly ? currentUser.value?.isAdmin : true)
+)
 
 // ── Drawer ─────────────────────────────────────────────────────────────
 const drawerOpen = ref(false)
@@ -70,7 +80,7 @@ function navigate(href: string) {
 
       <!-- Nav -->
       <nav class="flex flex-col gap-1 p-2 flex-1 overflow-y-auto">
-        <button v-for="item in navItems" :key="item.href" @click="navigate(item.href)"
+        <button v-for="item in visibleNavItems" :key="item.href" @click="navigate(item.href)"
           class="group flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-left transition-all duration-150 w-full"
           :class="[
             route.path.startsWith(item.href)
@@ -89,6 +99,11 @@ function navigate(href: string) {
               <path d="M4 2h5.5L12 4.5V14H4V2z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round" />
               <path d="M9 2v3h3" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round" />
               <path d="M6 7h4M6 9.5h4M6 12h2.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" />
+            </svg>
+            <svg v-else-if="item.icon === 'monitor'" class="w-4 h-4" viewBox="0 0 16 16" fill="none">
+              <rect x="1" y="2" width="14" height="10" rx="1.5" stroke="currentColor" stroke-width="1.3" />
+              <path d="M5.5 14h5M8 12v2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" />
+              <path d="M4 7l2 2 2-3 2 2 2-2" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round" />
             </svg>
           </span>
           <span v-if="sidebarOpen" class="text-xs font-medium whitespace-nowrap overflow-hidden">
@@ -158,11 +173,26 @@ function navigate(href: string) {
         </div>
 
         <div class="flex items-center gap-3">
-          <span class="text-xs" :class="isDark ? 'text-zinc-600' : 'text-zinc-400'">dev.team</span>
+          <span class="text-xs" :class="isDark ? 'text-zinc-600' : 'text-zinc-400'">
+            {{ currentUser?.login ?? 'dev.team' }}
+          </span>
           <div
-            class="flex h-7 w-7 items-center justify-center rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 text-[.65rem] font-semibold text-white">
-            DT
+            class="flex h-7 w-7 items-center justify-center rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 text-[.65rem] font-semibold text-white select-none">
+            {{ currentUser?.login?.slice(0, 2).toUpperCase() ?? 'DT' }}
           </div>
+          <button
+            @click="logout"
+            class="flex h-7 w-7 items-center justify-center rounded-lg transition-colors"
+            :class="isDark
+              ? 'text-zinc-600 hover:bg-white/[.04] hover:text-zinc-300'
+              : 'text-zinc-400 hover:bg-zinc-100 hover:text-zinc-700'"
+            title="Sair"
+          >
+            <svg class="w-4 h-4" viewBox="0 0 16 16" fill="none">
+              <path d="M6 2H3a1 1 0 00-1 1v10a1 1 0 001 1h3" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
+              <path d="M10 11l3-3-3-3M13 8H6" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </button>
         </div>
       </header>
 

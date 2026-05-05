@@ -1,4 +1,5 @@
 import { ref } from 'vue';
+import { authFetch } from './useAuth';
 
 const API_BASE = '/api';
 
@@ -28,7 +29,7 @@ export function useProjects() {
     loadingProjects.value = true;
     error.value = null;
     try {
-      const res = await fetch(`${API_BASE}/projects`);
+      const res = await authFetch(`${API_BASE}/projects`);
       if (!res.ok) throw new Error(`Erro ${res.status}`);
       projects.value = await res.json();
     } catch (e: any) {
@@ -43,7 +44,7 @@ export function useProjects() {
     sprints.value = [];
     error.value = null;
     try {
-      const res = await fetch(`${API_BASE}/projects/${projectId}/sprints`);
+      const res = await authFetch(`${API_BASE}/projects/${projectId}/sprints`);
       if (!res.ok) throw new Error(`Erro ${res.status}`);
       sprints.value = await res.json();
     } catch (e: any) {
@@ -57,7 +58,7 @@ export function useProjects() {
     generatingDocx.value = sprintId;
     error.value = null;
     try {
-      const res = await fetch(`${API_BASE}/sprints/${sprintId}/docx`);
+      const res = await authFetch(`${API_BASE}/sprints/${sprintId}/docx`);
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
         throw new Error(body.error || `Erro ${res.status}`);

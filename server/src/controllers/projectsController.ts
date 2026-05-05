@@ -8,10 +8,11 @@ export async function listProjects(_req: Request, res: Response) {
   try {
     const pool = await getConnection();
     const result = await pool.request().query(`
-      SELECT DISTINCT COD_PROJETO, PRO_NOME, 1 as PRO_DESCRICAO
-      FROM SUP_VERSAO_PROJETO_VI
-      WHERE PRO_NOME LIKE '%Educação%'
-      ORDER BY PRO_NOME
+      SELECT DISTINCT V.COD_PROJETO, V.PRO_NOME, 1 as PRO_DESCRICAO
+      FROM SUP_VERSAO_PROJETO_VI V
+	    INNER JOIN SUP_PROJETO P ON P.COD_PROJETO = V.COD_PROJETO
+	    WHERE P.PES_COD_GERENTE = 37318 AND P.PRO_STATUS = 1
+      ORDER BY V.PRO_NOME
     `);
     res.json(result.recordset);
   } catch (err: any) {
