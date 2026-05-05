@@ -20,7 +20,7 @@ export async function login(req: Request, res: Response) {
       .input('user', sql.NVarChar, user)
       .query(`
         SELECT DISTINCT U.USR_CODIGO, U.USR_LOGIN, U.USR_SENHA,
-        CASE WHEN  U.USR_CODIGO IN (22376,23409) THEN 1 ELSE 0 END AS IS_ADMIN
+        CASE WHEN  U.USR_CODIGO IN (22376,23409,22263) THEN 1 ELSE 0 END AS IS_ADMIN
         FROM FR_USUARIO U
         JOIN GER_PESSOA P ON P.USR_CODIGO = U.USR_CODIGO
         JOIN SUP_MEMBRO_PROJETO M ON P.PES_COD = M.PES_COD
