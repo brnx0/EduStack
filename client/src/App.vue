@@ -2,7 +2,7 @@
 import { computed, ref } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useTheme } from './composables/useTheme'
-import { useAuth, getUser } from './composables/useAuth'
+import { useAuth, currentUser } from './composables/useAuth'
 
 // ── Theme ──────────────────────────────────────────────────────────────
 const { isDark, toggleTheme } = useTheme()
@@ -30,7 +30,6 @@ const pageTitle = computed(() => {
 
 // ── Auth ───────────────────────────────────────────────────────────────
 const { logout } = useAuth()
-const currentUser = computed(() => getUser())
 
 const visibleNavItems = computed(() =>
   navItems.filter(item => item.adminOnly ? currentUser.value?.isAdmin : true)

@@ -1,3 +1,4 @@
+import { ref } from 'vue';
 import { useRouter } from 'vue-router';
 
 const TOKEN_KEY = 'edustack_token';
@@ -9,6 +10,14 @@ export interface AuthUser {
   isAdmin: boolean;
 }
 
+function _readUser(): AuthUser | null {
+  const raw = localStorage.getItem(USER_KEY) ?? sessionStorage.getItem(USER_KEY);
+  return raw ? JSON.parse(raw) : null;
+}
+
+// Ref reativo compartilhado em nível de módulo — persiste entre componentes
+export const currentUser = ref<AuthUser | null>(_readUser());
+
 export function getToken(): string | null {
   return localStorage.getItem(TOKEN_KEY) ?? sessionStorage.getItem(TOKEN_KEY);
 }
@@ -17,6 +26,7 @@ export function saveSession(token: string, user: AuthUser, remember: boolean) {
   const storage = remember ? localStorage : sessionStorage;
   storage.setItem(TOKEN_KEY, token);
   storage.setItem(USER_KEY, JSON.stringify(user));
+  currentUser.value = user;
 }
 
 export function clearSession() {
@@ -24,11 +34,11 @@ export function clearSession() {
   localStorage.removeItem(USER_KEY);
   sessionStorage.removeItem(TOKEN_KEY);
   sessionStorage.removeItem(USER_KEY);
+  currentUser.value = null;
 }
 
 export function getUser(): AuthUser | null {
-  const raw = localStorage.getItem(USER_KEY) ?? sessionStorage.getItem(USER_KEY);
-  return raw ? JSON.parse(raw) : null;
+  return currentUser.value;
 }
 
 export async function authFetch(input: string, init: RequestInit = {}): Promise<Response> {
