@@ -1,0 +1,42 @@
+[
+  {
+    "codServidor": 2,
+    "sistemaNome": "LIVE",
+    "tipo": "Dev",
+    "tipoOrigem": "Maker Local",
+    "descricao": null,
+    "url": "http://137.131.214.213",
+    "contexto": "EDU_LIVE",
+    "systemCode": "EDU",
+    "dirWebrun": null,
+    "dirTomcat": null,
+    "servicoTomcat": null,
+    "makerInterna": null,
+    "makerExterna": null,
+    "login": "admin",
+    "senha": "webrun",
+    "ativo": true,
+    "id": 1,
+    "criadoEm": "2026-05-19T14:38:44.141Z"
+  },
+  {
+    "codServidor": 2,
+    "sistemaNome": "PEI",
+    "tipo": "Dev",
+    "tipoOrigem": "Maker Local",
+    "descricao": null,
+    "url": "http://137.131.214.213",
+    "contexto": "PDI_DEV",
+    "systemCode": "PDI",
+    "dirWebrun": null,
+    "dirTomcat": null,
+    "servicoTomcat": null,
+    "makerInterna": null,
+    "makerExterna": null,
+    "login": "admin",
+    "senha": "webrun",
+    "ativo": true,
+    "id": 2,
+    "criadoEm": "2026-05-19T15:46:44.632Z"
+  }
+]

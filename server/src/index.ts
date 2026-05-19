@@ -4,6 +4,7 @@ import { Server } from 'socket.io';
 import cors from 'cors';
 import projectRoutes from './routes/projects.js';
 import authRoutes from './routes/auth.js';
+import jarGeneratorRoutes from './routes/jarGenerator.js';
 import { registerRoutes } from './routes/index.js';
 import { registerSocketHandlers } from './sockets/index.js';
 import { authMiddleware } from './middleware/auth.js';
@@ -13,6 +14,7 @@ app.use(cors());
 app.use(express.json());
 app.use('/api/auth', authRoutes);
 app.use('/api', authMiddleware, projectRoutes);
+app.use('/api/jar', authMiddleware, jarGeneratorRoutes);
 
 const httpServer = createServer(app);
 

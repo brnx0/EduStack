@@ -28,6 +28,12 @@ const router = createRouter({
       meta: { requiresAdmin: true },
     },
     {
+      path: '/jar',
+      name: 'jar-generator',
+      component: () => import('../views/JarGenerator/JarGeneratorView.vue'),
+      meta: { requiresAdmin: true },
+    },
+    {
       path: '/acesso-negado',
       name: 'access-denied',
       component: () => import('../views/AccessDenied/AccessDeniedView.vue'),

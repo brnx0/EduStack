@@ -1,0 +1,22 @@
+[
+  {
+    "nome": "LIVE PROD",
+    "ip": "98.88.90.141",
+    "portaSsh": 22,
+    "usuarioSsh": "breno",
+    "senhaSsh": "Fabrica@123",
+    "ativo": true,
+    "id": 1,
+    "criadoEm": "2026-05-19T14:28:38.609Z"
+  },
+  {
+    "nome": "DEV",
+    "ip": "137.131.214.213",
+    "portaSsh": 22,
+    "usuarioSsh": null,
+    "senhaSsh": null,
+    "ativo": true,
+    "id": 2,
+    "criadoEm": "2026-05-19T14:37:50.470Z"
+  }
+]

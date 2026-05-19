@@ -13,6 +13,7 @@ const sidebarOpen = ref(true)
 const navItems = [
   { label: 'Planning Poker', href: '/poker', icon: 'grid', adminOnly: false },
   { label: 'Atesto de Sprint', href: '/atesto', icon: 'doc', adminOnly: false },
+  { label: 'Gerador de JAR', href: '/jar', icon: 'package', adminOnly: true },
   { label: 'Monitor de Atividades', href: '/monitor', icon: 'monitor', adminOnly: true },
 ]
 
@@ -98,6 +99,10 @@ function navigate(href: string) {
               <path d="M4 2h5.5L12 4.5V14H4V2z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round" />
               <path d="M9 2v3h3" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round" />
               <path d="M6 7h4M6 9.5h4M6 12h2.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" />
+            </svg>
+            <svg v-else-if="item.icon === 'package'" class="w-4 h-4" viewBox="0 0 16 16" fill="none">
+              <path d="M2 5l6-3 6 3v6l-6 3-6-3V5z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round" />
+              <path d="M2 5l6 3 6-3M8 8v6.5" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round" />
             </svg>
             <svg v-else-if="item.icon === 'monitor'" class="w-4 h-4" viewBox="0 0 16 16" fill="none">
               <rect x="1" y="2" width="14" height="10" rx="1.5" stroke="currentColor" stroke-width="1.3" />
@@ -196,7 +201,7 @@ function navigate(href: string) {
       </header>
 
       <!-- Página — router-view único e definitivo -->
-      <main class="flex-1 overflow-hidden" :class="isDark ? 'bg-zinc-900' : 'bg-zinc-50'">
+      <main class="flex-1 min-h-0 overflow-hidden" :class="isDark ? 'bg-zinc-900' : 'bg-zinc-50'">
         <!-- isDark é passado via v-bind para todos os filhos que declaram a prop -->
         <router-view v-slot="{ Component }">
           <component :is="Component" :isDark="isDark" />

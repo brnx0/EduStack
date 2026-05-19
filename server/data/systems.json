@@ -1,0 +1,11 @@
+[
+  {
+    "codServidor": 1,
+    "nome": "maracas",
+    "pathRaiz": "/opt/settings/systems/maracas",
+    "nomeServico": "tomcat",
+    "ativo": true,
+    "id": 1,
+    "criadoEm": "2026-05-19T14:39:44.220Z"
+  }
+]
