@@ -39,6 +39,7 @@ export interface Sistema {
   nome: string
   pathRaiz: string
   nomeServico: string
+  nomeArquivo: string
   serverNome?: string
   serverIp?: string
 }
@@ -66,11 +67,14 @@ export interface GenerateResult {
   deployResults: DeployResult[]
 }
 
-async function apiCall<T>(url: string, options?: RequestInit): Promise<T> {
+async function apiCall<T>(url: string, options?: RequestInit, timeoutMs = 30_000): Promise<T> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
   const res = await authFetch(url, {
     ...options,
     headers: { 'Content-Type': 'application/json', ...options?.headers },
-  })
+    signal: controller.signal,
+  }).finally(() => clearTimeout(timer))
   const data = await res.json()
   if (!res.ok) {
     const detail = data.url ? `\nURL: ${data.url}` : ''
@@ -241,7 +245,7 @@ export function useJarGeneration() {
       result.value = await apiCall<GenerateResult>(`${API}/generate`, {
         method: 'POST',
         body: JSON.stringify(payload),
-      })
+      }, 30 * 60_000)
     } catch (e: any) {
       error.value = e.message
     } finally {

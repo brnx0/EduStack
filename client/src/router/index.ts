@@ -19,7 +19,6 @@ const router = createRouter({
       path: '/atesto',
       name: 'atesto',
       component: () => import('../views/Atesto/AtestoView.vue'),
-      meta: { requiresAdmin: true },
     },
     {
       path: '/monitor',
@@ -31,7 +30,6 @@ const router = createRouter({
       path: '/jar',
       name: 'jar-generator',
       component: () => import('../views/JarGenerator/JarGeneratorView.vue'),
-      meta: { requiresAdmin: true },
     },
     {
       path: '/acesso-negado',

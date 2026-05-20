@@ -55,9 +55,9 @@ export async function listSystemsByServer(req: Request, res: Response) {
 
 export async function createSystem(req: Request, res: Response) {
   try {
-    const { codServidor, nome, pathRaiz, nomeServico } = req.body;
+    const { codServidor, nome, pathRaiz, nomeServico, nomeArquivo } = req.body;
     const sys = create(COLLECTION, {
-      codServidor, nome, pathRaiz, nomeServico, ativo: true,
+      codServidor, nome, pathRaiz, nomeServico, nomeArquivo: nomeArquivo || '', ativo: true,
     } as any);
     res.status(201).json(sys);
   } catch (err: any) {
@@ -68,9 +68,9 @@ export async function createSystem(req: Request, res: Response) {
 export async function updateSystem(req: Request, res: Response) {
   try {
     const id = parseInt(req.params['id'] as string);
-    const { codServidor, nome, pathRaiz, nomeServico } = req.body;
+    const { codServidor, nome, pathRaiz, nomeServico, nomeArquivo } = req.body;
     const sys = update(COLLECTION, id, {
-      codServidor, nome, pathRaiz, nomeServico,
+      codServidor, nome, pathRaiz, nomeServico, nomeArquivo: nomeArquivo || '',
     });
     if (!sys) {
       res.status(404).json({ error: 'Sistema não encontrado' });

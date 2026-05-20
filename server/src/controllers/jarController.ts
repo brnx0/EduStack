@@ -5,6 +5,8 @@ import fs from 'fs';
 import path from 'path';
 import os from 'os';
 import { promisify } from 'util';
+import http from 'http';
+import https from 'https';
 
 const readdir = promisify(fs.readdir);
 const fsStat = promisify(fs.stat);
@@ -34,6 +36,7 @@ interface Sistema {
   nome: string;
   pathRaiz: string;
   nomeServico: string;
+  nomeArquivo?: string;
 }
 
 function buildSoapXml(user: string, password: string, systemCode: string, compileClasses: boolean, generateReports: boolean, generateAllRules: boolean): string {
@@ -78,6 +81,31 @@ function toUncPath(serverIp: string, windowsPath: string): string {
   return `\\\\${serverIp}\\${match[1]}$\\${match[2]}`;
 }
 
+function httpPost(url: string, body: string, headers: Record<string, string>, timeoutMs = 25 * 60 * 1000): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const parsed = new URL(url);
+    const lib = parsed.protocol === 'https:' ? https : http;
+    const data = Buffer.from(body, 'utf-8');
+    const req = lib.request({
+      hostname: parsed.hostname,
+      port: parsed.port || (parsed.protocol === 'https:' ? 443 : 80),
+      path: parsed.pathname + parsed.search,
+      method: 'POST',
+      headers: { ...headers, 'Content-Length': data.length },
+      timeout: timeoutMs,
+    }, (res) => {
+      let chunks = '';
+      res.setEncoding('utf-8');
+      res.on('data', (chunk) => { chunks += chunk; });
+      res.on('end', () => resolve(chunks));
+    });
+    req.on('timeout', () => { req.destroy(new Error('SOAP request timed out after 25 minutes')); });
+    req.on('error', reject);
+    req.write(data);
+    req.end();
+  });
+}
+
 export async function generateJar(req: Request, res: Response) {
   try {
     const {
@@ -117,25 +145,13 @@ export async function generateJar(req: Request, res: Response) {
     );
 
     console.log('[JAR] POST SOAP →', soapUrl);
+    console.log('[JAR] SOAP body:', soapXml);
 
-    const soapResponse = await fetch(soapUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'text/xml; charset=utf-8',
-        'SOAPAction': 'compileJAR',
-      },
-      body: soapXml,
+    const soapXmlResponse = await httpPost(soapUrl, soapXml, {
+      'Content-Type': 'text/xml; charset=utf-8',
+      'SOAPAction': 'compileJAR',
     });
-
-    if (!soapResponse.ok) {
-      res.status(502).json({
-        error: `SOAP request failed: ${soapResponse.status} ${soapResponse.statusText}`,
-        url: soapUrl,
-      });
-      return;
-    }
-
-    const soapXmlResponse = await soapResponse.text();
+    console.log('[JAR] SOAP response:', soapXmlResponse.substring(0, 1000));
     const downloadPath = extractDownloadPath(soapXmlResponse);
     const downloadUrl = `${baseUrl}/${ambiente.contexto}/${downloadPath}`;
 
@@ -180,6 +196,8 @@ export async function generateJar(req: Request, res: Response) {
         }
 
         try {
+          const ext = path.extname(jarFileName);
+          const deployFileName = sistema.nomeArquivo ? `${sistema.nomeArquivo}${ext}` : jarFileName;
           const result = await deployJar(
             {
               host: srvDest.ip,
@@ -189,7 +207,7 @@ export async function generateJar(req: Request, res: Response) {
             },
             localJarPath,
             sistema.pathRaiz,
-            jarFileName,
+            deployFileName,
             sistema.nomeServico
           );
           deployResults.push({ sistemaId, nome: sistema.nome, success: true, ...result });
@@ -203,6 +221,7 @@ export async function generateJar(req: Request, res: Response) {
 
     res.json({ success: true, jarFileName, downloadUrl, deployResults });
   } catch (err: any) {
+    console.error('[JAR] generateJar error:', err);
     res.status(500).json({ error: err.message });
   }
 }

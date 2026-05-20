@@ -13,7 +13,7 @@ const sidebarOpen = ref(true)
 const navItems = [
   { label: 'Planning Poker', href: '/poker', icon: 'grid', adminOnly: false },
   { label: 'Atesto de Sprint', href: '/atesto', icon: 'doc', adminOnly: false },
-  { label: 'Gerador de JAR', href: '/jar', icon: 'package', adminOnly: true },
+  { label: 'Gerador de JAR', href: '/jar', icon: 'package', adminOnly: false },
   { label: 'Monitor de Atividades', href: '/monitor', icon: 'monitor', adminOnly: true },
 ]
 

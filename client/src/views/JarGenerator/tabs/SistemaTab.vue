@@ -9,7 +9,7 @@ const { servers, fetchServers } = useServers()
 
 const formOpen = ref(false)
 const editing = ref<Sistema | null>(null)
-const form = ref({ codServidor: 0, nome: '', pathRaiz: '', nomeServico: '' })
+const form = ref({ codServidor: 0, nome: '', pathRaiz: '', nomeServico: '', nomeArquivo: '' })
 const saving = ref(false)
 
 onMounted(async () => {
@@ -18,13 +18,13 @@ onMounted(async () => {
 
 function openNew() {
   editing.value = null
-  form.value = { codServidor: servers.value[0]?.id || 0, nome: '', pathRaiz: '', nomeServico: '' }
+  form.value = { codServidor: servers.value[0]?.id || 0, nome: '', pathRaiz: '', nomeServico: '', nomeArquivo: '' }
   formOpen.value = true
 }
 
 function openEdit(s: Sistema) {
   editing.value = s
-  form.value = { codServidor: s.codServidor, nome: s.nome, pathRaiz: s.pathRaiz, nomeServico: s.nomeServico }
+  form.value = { codServidor: s.codServidor, nome: s.nome, pathRaiz: s.pathRaiz, nomeServico: s.nomeServico, nomeArquivo: s.nomeArquivo || '' }
   formOpen.value = true
 }
 
@@ -82,6 +82,7 @@ async function remove(id: number) {
             <th class="text-left font-medium px-4 py-2.5">Servidor</th>
             <th class="text-left font-medium px-4 py-2.5">Path Raiz</th>
             <th class="text-left font-medium px-4 py-2.5">Serviço</th>
+            <th class="text-left font-medium px-4 py-2.5">Nome Arquivo</th>
             <th class="text-right font-medium px-4 py-2.5">Ações</th>
           </tr>
         </thead>
@@ -93,6 +94,7 @@ async function remove(id: number) {
             <td class="px-4 py-3" :class="isDark ? 'text-zinc-400' : 'text-zinc-600'">{{ s.serverNome || '—' }}</td>
             <td class="px-4 py-3 font-mono text-[10px]" :class="isDark ? 'text-zinc-500' : 'text-zinc-500'">{{ s.pathRaiz }}</td>
             <td class="px-4 py-3" :class="isDark ? 'text-zinc-400' : 'text-zinc-600'">{{ s.nomeServico }}</td>
+            <td class="px-4 py-3 font-mono text-[10px]" :class="isDark ? 'text-zinc-500' : 'text-zinc-500'">{{ s.nomeArquivo || '—' }}</td>
             <td class="px-4 py-3 text-right">
               <button @click="openEdit(s)" class="mr-2 text-blue-500 hover:text-blue-400">Editar</button>
               <button @click="remove(s.id)" class="text-red-500 hover:text-red-400">Excluir</button>
@@ -150,6 +152,13 @@ async function remove(id: number) {
                 <input v-model="form.pathRaiz" required placeholder="/opt/webrun/systems/SGV"
                   class="rounded-lg border px-3 py-2 text-xs outline-none transition-colors font-mono"
                   :class="isDark ? 'border-white/[.08] bg-zinc-800 text-white focus:border-blue-500' : 'border-zinc-200 bg-white text-zinc-900 focus:border-blue-500'" />
+              </label>
+              <label class="flex flex-col gap-1">
+                <span class="text-xs font-medium" :class="isDark ? 'text-zinc-400' : 'text-zinc-600'">Nome do Arquivo (sem extensão)</span>
+                <input v-model="form.nomeArquivo" placeholder="ex: MeuSistema"
+                  class="rounded-lg border px-3 py-2 text-xs outline-none transition-colors font-mono"
+                  :class="isDark ? 'border-white/[.08] bg-zinc-800 text-white focus:border-blue-500' : 'border-zinc-200 bg-white text-zinc-900 focus:border-blue-500'" />
+                <span class="text-[10px]" :class="isDark ? 'text-zinc-600' : 'text-zinc-400'">Renomeia o JAR ao enviar. Extensão original mantida.</span>
               </label>
               <div class="flex justify-end gap-2 mt-2">
                 <button type="button" @click="formOpen = false"

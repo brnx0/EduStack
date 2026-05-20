@@ -77,7 +77,7 @@ export async function generateDocx(req: Request, res: Response) {
         INNER JOIN SUP_CASO C ON C.CAS_COD_VERSAO = V.COD_VERSAO
         INNER JOIN SUP_UPLOAD_REQUISITO A ON C.COD_CASO = A.COD_CASO
         WHERE C.CAS_CAT = 2
-          AND A.UPR_TIPO IN ('png', 'pdf', 'jpg')
+          AND (A.UPR_TIPO LIKE '%png%' OR A.UPR_TIPO LIKE '%pdf%' OR A.UPR_TIPO LIKE '%jpg%')
           AND V.COD_VERSAO = @sprint2
       `);
 
