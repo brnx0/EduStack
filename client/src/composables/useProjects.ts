@@ -17,6 +17,12 @@ export type Sprint = {
   VER_PREV_DATA: string;
 };
 
+export type AtestoOptions = {
+  clientLines: string[];
+  requester: string;
+  date: string; // aaaa-mm-dd
+};
+
 export function useProjects() {
   const projects = ref<Project[]>([]);
   const sprints = ref<Sprint[]>([]);
@@ -54,11 +60,15 @@ export function useProjects() {
     }
   }
 
-  async function downloadDocx(sprintId: number, sprintName: string) {
+  async function downloadDocx(sprintId: number, sprintName: string, options: AtestoOptions) {
     generatingDocx.value = sprintId;
     error.value = null;
     try {
-      const res = await authFetch(`${API_BASE}/sprints/${sprintId}/docx`);
+      const res = await authFetch(`${API_BASE}/sprints/${sprintId}/docx`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(options),
+      });
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
         throw new Error(body.error || `Erro ${res.status}`);

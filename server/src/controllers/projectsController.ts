@@ -39,10 +39,38 @@ export async function listSprints(req: Request, res: Response) {
   }
 }
 
+function formatDateBR(isoDate: string): string | null {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(isoDate);
+  return match ? `${match[3]}/${match[2]}/${match[1]}` : null;
+}
+
 export async function generateDocx(req: Request, res: Response) {
   try {
     const sprintId = req.params['sprintId'] as string;
+    const body = req.body ?? {};
+
+    const clientLines: string[] = Array.isArray(body.clientLines)
+      ? body.clientLines.map((l: unknown) => String(l ?? '').trim()).filter(Boolean)
+      : [];
+    const requester = typeof body.requester === 'string' ? body.requester.trim() : '';
+    const date = typeof body.date === 'string' ? formatDateBR(body.date) : null;
+
+    if (clientLines.length === 0 || !requester || !date) {
+      res.status(400).json({ error: 'Informe o cliente, a área solicitante e a data do atesto.' });
+      return;
+    }
+
     const pool = await getConnection();
+
+    const projectResult = await pool
+      .request()
+      .input('sprintProj', sql.Int, parseInt(sprintId))
+      .query(`
+        SELECT TOP 1 PRO_NOME
+        FROM SUP_VERSAO_PROJETO_VI
+        WHERE COD_VERSAO = @sprintProj
+      `);
+    const projectName: string = projectResult.recordset[0]?.PRO_NOME?.trim() ?? '';
 
     const casesResult = await pool
       .request()
@@ -83,7 +111,7 @@ export async function generateDocx(req: Request, res: Response) {
 
     const attachments = attachmentsResult.recordset;
 
-    const filePath = await createDocument(cases, attachments, sprintId);
+    const filePath = await createDocument(cases, attachments, { projectName, clientLines, requester, date });
 
     res.download(filePath, `Atesto_Sprint_${sprintId}.docx`, (err) => {
       if (!err) {

@@ -9,12 +9,21 @@ import {
 	WidthType,
 	AlignmentType,
 	ImageRun,
-	HeadingLevel,
 	ShadingType,
+	BorderStyle,
+	Header,
+	Footer,
+	PageNumber,
+	PageBreak,
+	VerticalAlign,
+	HorizontalPositionRelativeFrom,
+	VerticalPositionRelativeFrom,
+	HighlightColor,
 } from 'docx';
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
+import { fileURLToPath } from 'url';
 import { createCanvas, loadImage } from '@napi-rs/canvas';
 import { createRequire } from 'node:module';
 import { getDocument, GlobalWorkerOptions } from 'pdfjs-dist/legacy/build/pdf.mjs';
@@ -27,7 +36,28 @@ const workerPath = require.resolve('pdfjs-dist/legacy/build/pdf.worker.mjs');
 GlobalWorkerOptions.workerSrc = `file://${workerPath.replace(/\\/g, '/')}`;
 
 const TMP_DIR = path.join(os.tmpdir(), 'edustack');
-if (!fs.existsSync(TMP_DIR)) fs.mkdirSync(TMP_DIR, { recursive: true });
+
+// Funciona tanto em src/services (tsx) quanto em dist/services (build).
+const ASSETS_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../assets/atesto');
+
+// ── Dados fixos do modelo ────────────────────────────────────────────────────
+const EMPRESA_ENDERECO = 'Avenida da França, nº. 393, 2º andar – Comércio – Salvador – Ba – CEP: 40.010-000';
+const EMPRESA_CNPJ = 'CNPJ: 09.543.618/0001-72';
+const CONTRATADA = 'CONSORCIO ASTEC, CNPJ 46.460.782/0001-42';
+const CONTRATANTE = 'Prefeitura Municipal do Salvador – PMS';
+const CIDADE = 'Salvador-BA';
+const ENTREGA_PLACEHOLDER = '[00]ª entrega';
+
+// ── Estilo ───────────────────────────────────────────────────────────────────
+const FONT = 'Calibri';
+const TABLE_FONT = 'Arial';
+const COLOR_HEADING = '002060';
+const COLOR_TABLE_HEADER = '1F497D';
+
+// A4 em twips / pixels (96 dpi) e EMU por ponto
+const PAGE_W_PX = 794;
+const PAGE_H_PX = 1123;
+const EMU_PER_PT = 12700;
 
 type CaseRow = {
 	COD_CASO: number;
@@ -42,7 +72,12 @@ type AttachmentRow = {
 	UPR_ARQUIVO: Buffer;
 };
 
-type ImageDimensions = { width: number; height: number };
+export type AtestoInfo = {
+	projectName: string;
+	clientLines: string[];
+	requester: string;
+	date: string; // dd/mm/aaaa
+};
 
 function stripHtml(html: string): string {
 	if (!html) return '';
@@ -122,146 +157,288 @@ async function convertAttachment(attachment: AttachmentRow): Promise<PageImage[]
 	return [];
 }
 
-function headerRow(): TableRow {
-	const cells = ['Card', 'Sprint', 'Solicitação', 'Descrição'].map((label) =>
-		new TableCell({
-			shading: { type: ShadingType.SOLID, color: '1d4ed8' },
-			children: [
-				new Paragraph({
-					alignment: AlignmentType.CENTER,
-					children: [new TextRun({ text: label, bold: true, color: 'FFFFFF', size: 20 })],
-				}),
-			],
-		}),
-	);
-	return new TableRow({ children: cells, tableHeader: true });
+// ── Cabeçalho / rodapé ───────────────────────────────────────────────────────
+
+function pageHeader(background: Buffer, logo: Buffer): Header {
+	return new Header({
+		children: [
+			new Paragraph({
+				children: [
+					// Fundo da página inteira: faixa azul no topo e faixas preta/azul no rodapé.
+					new ImageRun({
+						type: 'png',
+						data: background,
+						transformation: { width: PAGE_W_PX, height: PAGE_H_PX },
+						floating: {
+							horizontalPosition: { relative: HorizontalPositionRelativeFrom.PAGE, offset: 0 },
+							verticalPosition: { relative: VerticalPositionRelativeFrom.PAGE, offset: 0 },
+							behindDocument: true,
+							allowOverlap: true,
+						},
+					}),
+					new ImageRun({
+						type: 'png',
+						data: logo,
+						transformation: { width: 159, height: 104 },
+						floating: {
+							horizontalPosition: { relative: HorizontalPositionRelativeFrom.PAGE, offset: Math.round(16.6 * EMU_PER_PT) },
+							verticalPosition: { relative: VerticalPositionRelativeFrom.PAGE, offset: Math.round(26 * EMU_PER_PT) },
+							allowOverlap: true,
+						},
+					}),
+				],
+			}),
+		],
+	});
 }
 
-function caseRow(cas: CaseRow, description: string, isEven: boolean): TableRow {
-	const bg = isEven ? 'F1F5F9' : 'FFFFFF';
-	const makeCell = (text: string) =>
-		new TableCell({
-			shading: { type: ShadingType.SOLID, color: bg },
-			children: [new Paragraph({ children: [new TextRun({ text: text ?? '', size: 18 })] })],
+function pageFooter(withPageNumber: boolean): Footer {
+	const line = (text: string) =>
+		new Paragraph({
+			alignment: AlignmentType.CENTER,
+			children: [new TextRun({ text, font: FONT, size: 22 })],
 		});
 
-	return new TableRow({
-		children: [
-			makeCell(String(cas.COD_CASO)),
-			makeCell(`Sprint${cas.Sprint}`.trim()),
-			makeCell(stripHtml(cas.CAS_RESUMO ?? '')),
-			makeCell(stripHtml(description ?? cas.CAS_DESCRICAO ?? '')),
+	const children = [line(EMPRESA_ENDERECO), line(EMPRESA_CNPJ)];
+	if (withPageNumber) {
+		children.push(
+			new Paragraph({
+				alignment: AlignmentType.RIGHT,
+				spacing: { before: 120 },
+				children: [
+					new TextRun({ font: FONT, size: 22, children: ['Página ', PageNumber.CURRENT, ' de ', PageNumber.TOTAL_PAGES] }),
+				],
+			}),
+		);
+	}
+	return new Footer({ children });
+}
+
+// ── Blocos de conteúdo ───────────────────────────────────────────────────────
+
+function heading(text: string, before = 240): Paragraph {
+	return new Paragraph({
+		spacing: { before, after: 200 },
+		children: [new TextRun({ text, bold: true, size: 32, color: COLOR_HEADING, font: FONT })],
+	});
+}
+
+function coverPage(info: AtestoInfo): Paragraph[] {
+	const centered = (text: string, size: number, after = 0) =>
+		new Paragraph({
+			alignment: AlignmentType.CENTER,
+			spacing: { after },
+			children: [new TextRun({ text, bold: true, size, font: FONT })],
+		});
+
+	return [
+		new Paragraph({ spacing: { before: 4400 }, children: [] }),
+		centered(info.projectName.toLocaleUpperCase('pt-BR'), 48, 60),
+		centered('DOCUMENTO DE ATESTO', 42, 360),
+		centered('Cliente', 28, 40),
+		...info.clientLines.map((line) => centered(line, 26)),
+		new Paragraph({ children: [new PageBreak()] }),
+	];
+}
+
+function introduction(info: AtestoInfo): Paragraph[] {
+	const run = (text: string, bold = false) => new TextRun({ text, bold, size: 24, font: FONT });
+
+	return [
+		heading('Introdução', 1600),
+		new Paragraph({
+			alignment: AlignmentType.JUSTIFIED,
+			spacing: { after: 240, line: 300 },
+			children: [
+				run('Este documento intitulado de DOCUMENTO DE ATESTO visa formalizar a entrega e o aceite dos itens do '),
+				run(`${info.projectName.toLocaleUpperCase('pt-BR')}, `, true),
+				new TextRun({ text: ENTREGA_PLACEHOLDER, bold: true, size: 24, font: FONT, highlight: HighlightColor.YELLOW }),
+				run(' referente às solicitações da '),
+				run(info.requester, true),
+			],
+		}),
+		new Paragraph({
+			alignment: AlignmentType.JUSTIFIED,
+			spacing: { after: 240, line: 300 },
+			children: [
+				run('Todos os produtos e artefatos foram produzidos conforme as normas estabelecidas no contrato firmado entre a empresa '),
+				run(CONTRATADA, true),
+				run(' e a '),
+				run(CONTRATANTE, true),
+				run('.'),
+			],
+		}),
+		heading('Relação de Entregas:'),
+	];
+}
+
+const CELL_BORDERS = {
+	top: { style: BorderStyle.SINGLE, size: 4, color: '000000' },
+	bottom: { style: BorderStyle.SINGLE, size: 4, color: '000000' },
+	left: { style: BorderStyle.SINGLE, size: 4, color: '000000' },
+	right: { style: BorderStyle.SINGLE, size: 4, color: '000000' },
+};
+
+function deliveriesTable(cases: CaseRow[], descriptions: string[]): Table {
+	const COL_WIDTHS = [33, 67];
+
+	const headerCell = (text: string, width: number) =>
+		new TableCell({
+			width: { size: width, type: WidthType.PERCENTAGE },
+			borders: CELL_BORDERS,
+			shading: { type: ShadingType.CLEAR, color: 'auto', fill: COLOR_TABLE_HEADER },
+			verticalAlign: VerticalAlign.CENTER,
+			margins: { top: 60, bottom: 60, left: 100, right: 100 },
+			children: [new Paragraph({ children: [new TextRun({ text, color: 'FFFFFF', size: 28, font: FONT })] })],
+		});
+
+	const bodyCell = (text: string, width: number) =>
+		new TableCell({
+			width: { size: width, type: WidthType.PERCENTAGE },
+			borders: CELL_BORDERS,
+			verticalAlign: VerticalAlign.CENTER,
+			margins: { top: 40, bottom: 40, left: 100, right: 100 },
+			children: text
+				.split('\n')
+				.map((line) => new Paragraph({ children: [new TextRun({ text: line, size: 20, font: TABLE_FONT })] })),
+		});
+
+	return new Table({
+		width: { size: 100, type: WidthType.PERCENTAGE },
+		rows: [
+			new TableRow({
+				tableHeader: true,
+				children: [headerCell('Funcionalidades', COL_WIDTHS[0]!), headerCell('Descrição das funcionalidades', COL_WIDTHS[1]!)],
+			}),
+			...cases.map(
+				(c, i) =>
+					new TableRow({
+						cantSplit: true,
+						children: [
+							bodyCell(stripHtml(c.CAS_RESUMO ?? ''), COL_WIDTHS[0]!),
+							bodyCell(descriptions[i] ?? stripHtml(c.CAS_DESCRICAO ?? ''), COL_WIDTHS[1]!),
+						],
+					}),
+			),
 		],
 	});
 }
 
-export async function createDocument(
-	cases: CaseRow[],
-	attachments: AttachmentRow[],
-	sprintId: string,
-): Promise<string> {
-	const rawDescriptions = cases.map((c) => stripHtml(c.CAS_DESCRICAO ?? ''));
-	const enriched = await enrichDescriptions(rawDescriptions);
+function signaturePage(info: AtestoInfo): Paragraph[] {
+	const centered = (text: string, size: number, before = 0) =>
+		new Paragraph({
+			alignment: AlignmentType.CENTER,
+			spacing: { before },
+			children: [new TextRun({ text, bold: true, size, font: FONT })],
+		});
 
-	const casesTable = new Table({
-		width: { size: 100, type: WidthType.PERCENTAGE },
-		rows: [
-			headerRow(),
-			...cases.map((c, i) => caseRow(c, enriched[i] ?? c.CAS_DESCRICAO, i % 2 === 0)),
-		],
-	});
+	return [
+		new Paragraph({ children: [new PageBreak()] }),
+		new Paragraph({ children: [new TextRun({ text: 'ATESTADO O SERVIÇO POR:', bold: true, size: 28, font: FONT })] }),
+		centered('_________________________________', 28, 2400),
+		centered('Assinatura do responsável', 28),
+		centered(info.requester, 28),
+		centered(`${CIDADE}, ${info.date}`, 28, 3000),
+	];
+}
 
-	const attachmentSections: (Paragraph | Table)[] = [];
+async function attachmentsSection(attachments: AttachmentRow[]): Promise<Paragraph[]> {
+	const out: Paragraph[] = [];
 
 	// Dimensões que cabem 2 imagens por página A4 sem distorcer
 	const MAX_W = 440;
 	const MAX_H = 420;
 
+	const label = (text: string) =>
+		new Paragraph({
+			spacing: { before: 240, after: 60 },
+			children: [new TextRun({ text, bold: true, size: 18, color: COLOR_TABLE_HEADER, font: FONT })],
+		});
+
 	for (const att of attachments) {
 		const pages = await convertAttachment(att);
 
-		if (pages.length > 0) {
-			for (const [idx, page] of pages.entries()) {
-				// Mantém proporção respeitando os dois limites
-				const scaleByW = MAX_W / page.width;
-				const scaleByH = MAX_H / page.height;
-				const scale = Math.min(scaleByW, scaleByH);
-				const dispW = Math.round(page.width * scale);
-				const dispH = Math.round(page.height * scale);
-
-				const label = pages.length > 1
-					? `Card: ${att.COD_CASO}   |   Pág. ${idx + 1} / ${pages.length}`
-					: `Card: ${att.COD_CASO}`;
-
-				attachmentSections.push(
-					new Paragraph({
-						spacing: { before: 240, after: 60 },
-						children: [new TextRun({ text: label, bold: true, size: 18, color: '1d4ed8' })],
-					}),
-					new Paragraph({
-						alignment: AlignmentType.CENTER,
-						spacing: { after: 200 },
-						children: [
-							new ImageRun({
-								data: page.buf,
-								transformation: { width: dispW, height: dispH },
-								type: 'png',
-							}),
-						],
-					}),
-				);
-			}
-		} else {
-			attachmentSections.push(
+		if (pages.length === 0) {
+			out.push(
+				label(`Card: ${att.COD_CASO}`),
 				new Paragraph({
-					spacing: { before: 240, after: 60 },
-					children: [new TextRun({ text: `Card: ${att.COD_CASO}`, bold: true, size: 18, color: '1d4ed8' })],
+					children: [new TextRun({ text: '[Anexo não pôde ser renderizado]', italics: true, color: '999999', font: FONT })],
 				}),
+			);
+			continue;
+		}
+
+		for (const [idx, page] of pages.entries()) {
+			// Mantém proporção respeitando os dois limites
+			const scale = Math.min(MAX_W / page.width, MAX_H / page.height);
+			out.push(
+				label(pages.length > 1 ? `Card: ${att.COD_CASO}   |   Pág. ${idx + 1} / ${pages.length}` : `Card: ${att.COD_CASO}`),
 				new Paragraph({
-					children: [new TextRun({ text: '[Anexo não pôde ser renderizado]', italics: true, color: '999999' })],
+					alignment: AlignmentType.CENTER,
+					spacing: { after: 200 },
+					children: [
+						new ImageRun({
+							data: page.buf,
+							transformation: { width: Math.round(page.width * scale), height: Math.round(page.height * scale) },
+							type: 'png',
+						}),
+					],
 				}),
 			);
 		}
 	}
 
-	const today = new Date().toLocaleDateString('pt-BR');
+	if (out.length === 0) return [];
+	return [new Paragraph({ children: [new PageBreak()] }), heading('Anexos', 0), ...out];
+}
+
+// ── Montagem ─────────────────────────────────────────────────────────────────
+
+export async function createDocument(
+	cases: CaseRow[],
+	attachments: AttachmentRow[],
+	info: AtestoInfo,
+): Promise<string> {
+	const aiInput = cases.map((c) => {
+		const title = stripHtml(c.CAS_RESUMO ?? '');
+		const description = stripHtml(c.CAS_DESCRICAO ?? '');
+		return `Funcionalidade: ${title}\nDescrição: ${description}`;
+	});
+	const fallback = cases.map((c) => stripHtml(c.CAS_DESCRICAO ?? ''));
+	const enriched = await enrichDescriptions(aiInput);
+	// Se a IA falhar, enrichDescriptions devolve a própria entrada; nesse caso usa só a descrição.
+	const descriptions = enriched === aiInput ? fallback : enriched;
+
+	const background = fs.readFileSync(path.join(ASSETS_DIR, 'fundo-pagina.png'));
+	const logo = fs.readFileSync(path.join(ASSETS_DIR, 'logo-sudoeste.png'));
+	const header = pageHeader(background, logo);
 
 	const doc = new Document({
+		styles: { default: { document: { run: { font: FONT, size: 24 } } } },
 		sections: [
 			{
+				properties: {
+					titlePage: true,
+					page: {
+						size: { width: 11906, height: 16838 },
+						margin: { top: 2700, bottom: 1900, left: 1134, right: 1134, header: 500, footer: 700 },
+					},
+				},
+				headers: { default: header, first: header },
+				footers: { default: pageFooter(true), first: pageFooter(false) },
 				children: [
-					new Paragraph({
-						alignment: AlignmentType.CENTER,
-						spacing: { after: 100 },
-						children: [new TextRun({ text: 'ATESTO DE SPRINT', bold: true, size: 32, color: '1d4ed8' })],
-					}),
-					new Paragraph({
-						alignment: AlignmentType.CENTER,
-						spacing: { after: 400 },
-						children: [new TextRun({ text: `Data: ${today}`, size: 20, color: '64748b' })],
-					}),
-					new Paragraph({
-						heading: HeadingLevel.HEADING_2,
-						spacing: { before: 200, after: 200 },
-						children: [new TextRun({ text: 'Casos de Teste', bold: true })],
-					}),
-					casesTable,
-					...(attachmentSections.length > 0
-						? [
-							new Paragraph({
-								heading: HeadingLevel.HEADING_2,
-								spacing: { before: 600, after: 200 },
-								children: [new TextRun({ text: 'Anexos', bold: true })],
-							}),
-							...attachmentSections,
-						]
-						: []),
+					...coverPage(info),
+					...introduction(info),
+					deliveriesTable(cases, descriptions),
+					...signaturePage(info),
+					...(await attachmentsSection(attachments)),
 				],
 			},
 		],
 	});
 
 	const buffer = await Packer.toBuffer(doc);
+	if (!fs.existsSync(TMP_DIR)) fs.mkdirSync(TMP_DIR, { recursive: true });
 	const outPath = path.join(TMP_DIR, `Atesto_Final_${Date.now()}.docx`);
 	fs.writeFileSync(outPath, buffer);
 	return outPath;

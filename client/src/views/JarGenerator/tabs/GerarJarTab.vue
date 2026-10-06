@@ -224,9 +224,16 @@ function formatBytes(bytes: number) {
       <p class="text-sm font-semibold mb-2" :class="isDark ? 'text-emerald-400' : 'text-emerald-700'">
         JAR gerado com sucesso!
       </p>
-      <p class="text-xs mb-3" :class="isDark ? 'text-zinc-400' : 'text-zinc-600'">
+      <p class="text-xs mb-2" :class="isDark ? 'text-zinc-400' : 'text-zinc-600'">
         Arquivo: <b>{{ result.jarFileName }}</b>
       </p>
+      <a v-if="result.downloadUrl" :href="result.downloadUrl" target="_blank" download
+        class="inline-flex items-center gap-1.5 text-xs font-medium text-blue-400 hover:text-blue-300 mb-3">
+        <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 16 16" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M8 2v8m0 0l-3-3m3 3l3-3M2 13h12" />
+        </svg>
+        Baixar {{ result.jarFileName }}
+      </a>
       <div v-if="result.deployResults.length > 0" class="flex flex-col gap-1">
         <div v-for="(d, i) in result.deployResults" :key="i" class="flex items-center gap-2 text-xs">
           <span v-if="d.success" class="text-emerald-500">&#10003;</span>

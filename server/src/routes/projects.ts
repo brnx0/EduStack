@@ -7,7 +7,7 @@ const router = Router();
 
 router.get('/projects', listProjects);
 router.get('/projects/:projectId/sprints', listSprints);
-router.get('/sprints/:sprintId/docx', generateDocx);
+router.post('/sprints/:sprintId/docx', generateDocx);
 router.get('/monitor/daily', adminMiddleware, getDailyActivity);
 
 export default router;

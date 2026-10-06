@@ -21,7 +21,7 @@
     "jsonwebtoken": "^9.0.3",
     "mssql": "^12.4.0",
     "multer": "^2.1.1",
-    "openai": "^6.34.0",
+    "openai": "^6.49.0",
     "pdfjs-dist": "^5.6.205",
     "socket.io": "^4.8.3",
     "ssh2": "^1.17.0"
