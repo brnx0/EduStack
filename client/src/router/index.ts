@@ -32,6 +32,11 @@ const router = createRouter({
       component: () => import('../views/JarGenerator/JarGeneratorView.vue'),
     },
     {
+      path: '/servicos',
+      name: 'services',
+      component: () => import('../views/Services/ServicesView.vue'),
+    },
+    {
       path: '/acesso-negado',
       name: 'access-denied',
       component: () => import('../views/AccessDenied/AccessDeniedView.vue'),

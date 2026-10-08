@@ -14,6 +14,7 @@ const navItems = [
   { label: 'Planning Poker', href: '/poker', icon: 'grid', adminOnly: false },
   { label: 'Atesto de Sprint', href: '/atesto', icon: 'doc', adminOnly: false },
   { label: 'Gerador de JAR', href: '/jar', icon: 'package', adminOnly: false },
+  { label: 'Serviços', href: '/servicos', icon: 'server', adminOnly: false },
   { label: 'Monitor de Atividades', href: '/monitor', icon: 'monitor', adminOnly: true },
 ]
 
@@ -108,6 +109,11 @@ function navigate(href: string) {
               <rect x="1" y="2" width="14" height="10" rx="1.5" stroke="currentColor" stroke-width="1.3" />
               <path d="M5.5 14h5M8 12v2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" />
               <path d="M4 7l2 2 2-3 2 2 2-2" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round" />
+            </svg>
+            <svg v-else-if="item.icon === 'server'" class="w-4 h-4" viewBox="0 0 16 16" fill="none">
+              <rect x="2" y="2" width="12" height="5" rx="1.2" stroke="currentColor" stroke-width="1.3" />
+              <rect x="2" y="9" width="12" height="5" rx="1.2" stroke="currentColor" stroke-width="1.3" />
+              <path d="M4.5 4.5h.01M4.5 11.5h.01" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" />
             </svg>
           </span>
           <span v-if="sidebarOpen" class="text-xs font-medium whitespace-nowrap overflow-hidden">
